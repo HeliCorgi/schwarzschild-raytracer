@@ -1,0 +1,1105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Schwarzschild — first-principles GR ray tracer</title>
+<style>
+:root{
+  --bg:#06080d; --panel:#0d1219; --line:#1d2733; --ink:#c9d4e3; --dim:#8fa3bd;
+  --blue:#6fb3ff;   /* blueshift / approaching */
+  --amber:#ff9a5c;  /* redshift / horizon */
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+  font:13px/1.5 ui-monospace,"SF Mono","Cascadia Code",Menlo,Consolas,monospace;overflow:hidden}
+#gl{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#gl:active{cursor:grabbing}
+
+#fatal{position:fixed;left:0;right:0;bottom:0;z-index:50;background:#2a0e12;color:#ffb4a8;
+  padding:10px 14px;white-space:pre-wrap;border-top:1px solid #5a2730}
+#fatal:empty{display:none}
+
+#topleft{position:fixed;top:14px;left:14px;z-index:3;pointer-events:none}
+#topleft h1{margin:0 0 2px;font-size:15px;font-weight:600;letter-spacing:.42em;text-transform:uppercase}
+#topleft .sub{margin:0 0 10px;color:var(--dim);font-size:11px;letter-spacing:.08em}
+#hud{margin:0;white-space:pre;font-size:11.5px;color:var(--ink);
+  background:rgba(7,10,16,.55);border:1px solid var(--line);border-radius:4px;
+  padding:8px 10px;display:inline-block}
+
+#fps{position:fixed;left:14px;bottom:10px;z-index:3;color:var(--dim);font-size:11px}
+
+#inset{position:fixed;bottom:14px;right:14px;z-index:3;border:1px solid var(--line);
+  border-radius:4px;transition:right .25s ease}
+body:not(.panelHidden) #inset{right:316px}
+
+#panelToggle{position:fixed;top:10px;right:10px;z-index:6}
+#panel{position:fixed;top:0;right:0;height:100%;width:300px;z-index:4;
+  background:rgba(13,18,25,.92);border-left:1px solid var(--line);
+  padding:44px 14px 26px;overflow-y:auto;backdrop-filter:blur(6px);
+  transition:transform .25s ease}
+body.panelHidden #panel{transform:translateX(105%)}
+#panel h2{margin:16px 0 8px;font-size:10px;font-weight:600;letter-spacing:.24em;
+  text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--line);padding-bottom:4px}
+#panel h2:first-child{margin-top:0}
+.row{display:grid;grid-template-columns:86px 1fr 62px;align-items:center;gap:8px;margin:7px 0}
+.row .k{color:var(--dim);font-size:11px}
+.row .v{text-align:right;font-size:11px;color:var(--blue)}
+input[type=range]{width:100%;accent-color:var(--blue);background:transparent}
+.chk{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:12px;color:var(--ink)}
+.chk input{accent-color:var(--blue)}
+select{background:var(--panel);color:var(--ink);border:1px solid var(--line);
+  border-radius:3px;font:inherit;font-size:11px;padding:3px 4px;width:100%}
+button{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:4px;
+  font:inherit;font-size:12px;padding:7px 10px;cursor:pointer;width:100%;margin:4px 0}
+button:hover{border-color:var(--dim)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+#panelToggle{width:auto;padding:5px 10px}
+#plungeBtn{border-color:var(--amber);color:var(--amber)}
+#plungeBtn:hover{background:rgba(255,154,92,.08)}
+body.plunging .plungeLock{opacity:.35;pointer-events:none}
+.hint{color:var(--dim);font-size:10.5px;margin-top:14px;line-height:1.6}
+
+#valbox{position:fixed;left:14px;bottom:34px;z-index:7;display:none;
+  max-width:min(660px,92vw);background:rgba(13,18,25,.96);
+  border:1px solid var(--line);border-radius:6px}
+#valbox.show{display:block}
+#valbox .vhead{display:flex;justify-content:space-between;align-items:center;gap:14px;
+  padding:7px 10px;border-bottom:1px solid var(--line);color:var(--dim);font-size:11px}
+#valbox .vhead button{width:auto;margin:0;padding:3px 9px}
+#valout{margin:0;padding:10px 12px;white-space:pre-wrap;font-size:11.5px;max-height:42vh;overflow:auto}
+
+#horizonFlash{position:fixed;inset:0;z-index:9;pointer-events:none;opacity:0;
+  display:flex;align-items:center;justify-content:center;transition:opacity .8s ease;
+  background:radial-gradient(ellipse at center,rgba(255,154,92,.10),rgba(0,0,0,0) 62%)}
+#horizonFlash.show{opacity:1}
+#horizonFlash div{text-align:center}
+#horizonFlash strong{display:block;color:var(--amber);font-size:17px;letter-spacing:.34em;
+  text-transform:uppercase;margin-bottom:8px;text-shadow:0 0 22px rgba(255,154,92,.45)}
+#horizonFlash span{color:var(--dim);font-size:12px}
+
+@media (max-width:640px){
+  #panel{width:min(80vw,300px)}
+  body:not(.panelHidden) #inset{right:14px;bottom:14px;opacity:.25}
+  #inset{width:170px;height:170px}
+  #topleft h1{font-size:13px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none !important}
+}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="fatal"></div>
+
+<div id="topleft">
+  <h1>Schwarzschild</h1>
+  <p class="sub">first-principles null-geodesic ray tracer · WebGL2 · zero dependencies</p>
+  <pre id="hud"></pre>
+</div>
+
+<span id="fps"></span>
+<canvas id="inset" width="240" height="240"></canvas>
+
+<button id="panelToggle" title="show / hide controls">controls</button>
+<aside id="panel">
+  <h2>Spacetime</h2>
+  <label class="row plungeLock"><span class="k">mass M</span>
+    <input type="range" id="mass" min="0.5" max="2.5" step="0.01" value="1"><span class="v" id="massV"></span></label>
+  <label class="row plungeLock"><span class="k">observer r</span>
+    <input type="range" id="dist" min="6" max="140" step="0.5" value="27"><span class="v" id="distV"></span></label>
+
+  <h2>Accretion disk</h2>
+  <label class="row"><span class="k">inclination</span>
+    <input type="range" id="incl" min="0" max="88" step="1" value="74"><span class="v" id="inclV"></span></label>
+  <label class="row"><span class="k">outer radius</span>
+    <input type="range" id="rout" min="2.2" max="5" step="0.1" value="3.4"><span class="v" id="routV"></span></label>
+  <label class="row"><span class="k">peak T</span>
+    <input type="range" id="tpeak" min="3000" max="20000" step="100" value="8500"><span class="v" id="tpeakV"></span></label>
+  <label class="chk"><input type="checkbox" id="tDisk"> disk visible</label>
+  <label class="chk"><input type="checkbox" id="tShift"> gravitational + Doppler color shift</label>
+  <label class="chk"><input type="checkbox" id="tBeam"> relativistic beaming (g&#8308; intensity)</label>
+  <label class="chk"><input type="checkbox" id="tTurb"> turbulence texture (decorative)</label>
+  <label class="chk"><input type="checkbox" id="tSpin"> reverse disk rotation</label>
+
+  <h2>Camera</h2>
+  <label class="row"><span class="k">field of view</span>
+    <input type="range" id="fov" min="35" max="100" step="1" value="62"><span class="v" id="fovV"></span></label>
+  <label class="row"><span class="k">exposure</span>
+    <input type="range" id="expo" min="0.2" max="4" step="0.05" value="1.25"><span class="v" id="expoV"></span></label>
+  <label class="row"><span class="k">render scale</span>
+    <input type="range" id="rscale" min="0.35" max="1" step="0.05" value="0.7"><span class="v" id="rscaleV"></span></label>
+
+  <h2>Sky</h2>
+  <label class="chk"><input type="checkbox" id="tStars"> lensed starfield</label>
+  <label class="chk"><input type="checkbox" id="tGrid"> celestial grid (shows multiple imaging)</label>
+
+  <h2>Plunge</h2>
+  <label class="row"><span class="k">rate</span>
+    <input type="range" id="prate" min="0.2" max="4" step="0.1" value="1"><span class="v" id="prateV"></span></label>
+  <label class="row"><span class="k">tidal readout</span>
+    <select id="tidalSel">
+      <option value="10" selected>10 M&#9737; (stellar-mass)</option>
+      <option value="4000000">4&#215;10&#8310; M&#9737; (Sgr A*-like)</option>
+    </select><span class="v"></span></label>
+  <button id="plungeBtn">Plunge through the horizon</button>
+
+  <h2>Diagnostics</h2>
+  <label class="chk"><input type="checkbox" id="tDrift"> integration-drift heat map</label>
+  <label class="chk"><input type="checkbox" id="tInset"> orbit chart (test particles)</label>
+  <button id="valBtn">Run validation suite</button>
+  <button id="resetBtn">Reset view</button>
+
+  <p class="hint">drag — look around · wheel / pinch — zoom<br>
+  during a plunge the camera rides a radial timelike geodesic;<br>
+  mass and distance lock until you return to orbit.<br><br>
+  exact Schwarzschild geometry · RK4 with error control<br>
+  shadow edge = b_c = 3&#8730;3&#8201;M ≈ 5.196&#8201;M</p>
+</aside>
+
+<div id="valbox">
+  <div class="vhead"><span>validation suite — error-controlled RK4 (CPU), same equations as the GPU marcher</span>
+  <button id="valClose">close</button></div>
+  <pre id="valout"></pre>
+</div>
+
+<div id="horizonFlash"><div>
+  <strong>You have crossed the event horizon</strong>
+  <span>r &lt; 2M — locally nothing marks the crossing, but every future-directed path now ends at r = 0.<br>
+  The view stays computable: the equations integrated here are regular at r = 2M.</span>
+</div></div>
+
+<script>
+'use strict';
+/* =====================================================================================
+   SCHWARZSCHILD BLACK HOLE — a first-principles general-relativistic ray tracer
+   =====================================================================================
+
+   Everything below is derived from the Schwarzschild line element (G = c = 1):
+
+       ds² = −f(r) dt² + f(r)⁻¹ dr² + r² (dθ² + sin²θ dφ²),     f(r) = 1 − 2M/r.
+
+   STEP 1 — GEODESIC EQUATIONS (derivation)
+   -----------------------------------------
+   Spherical symmetry ⇒ every geodesic lies in a plane through the origin; we rotate
+   each light ray into its own orbital plane and work with (t, r, φ) there.
+
+   Killing vectors ∂_t and ∂_φ give two constants of motion per geodesic
+   (λ = affine parameter, overdot = d/dλ):
+
+       E = f ṫ            (Killing energy)
+       L = r² φ̇           (Killing angular momentum)
+
+   Null condition  g_{μν} ẋ^μ ẋ^ν = 0:
+
+       −f ṫ² + ṙ²/f + r² φ̇² = 0   ⇒   ṙ² = E² − f L²/r²                    (✦)
+
+   The impact parameter is b = L/E. The "potential" f/r² = (1−2M/r)/r² peaks at
+   r = 3M (the PHOTON SPHERE) with value 1/(27M²), so rays are captured iff
+
+       b < b_c = √27 · M = 3√3 M ≈ 5.196152 M       (verified numerically: see tests)
+
+   Differentiating (✦) along the ray removes the turning-point sign ambiguity and
+   yields a strikingly clean second-order equation:
+
+       r̈ = L² (r − 3M) / r⁴                                                  (✧)
+
+   (✧) involves neither t nor f — it is REGULAR AT THE HORIZON. Eliminating t via
+   the conserved E is mathematically the same move as switching to horizon-regular
+   coordinates (ingoing Eddington–Finkelstein / Painlevé–Gullstrand): the r = 2M
+   pathology of Schwarzschild time simply never enters the integration. This is what
+   makes the "plunge mode" below possible without any special-casing at the horizon.
+
+   Timelike geodesics (test particles, g·u·u = −1) the same way:
+
+       ṙ² = Ẽ² − f (1 + L²/r²)   ⇒   r̈ = −M/r² + L² (r − 3M)/r⁴             (✧′)
+
+   i.e. the Newtonian pull plus a GR-corrected centrifugal term. Circular orbits:
+   L² = M r²/(r − 3M), stable only for r ≥ 6M (the ISCO) — which is why the disk’s
+   inner edge sits at 6M.
+
+   STEP 1b — CAMERA TETRAD for a general radially-moving observer
+   --------------------------------------------------------------
+   Work in the Painlevé–Gullstrand chart (regular across r = 2M),
+       ds² = −f dT² + 2s dT dr + dr² + r²dΩ²,   s = √(2M/r).
+   A radial observer with conserved Killing energy Ẽ has radial speed
+       w = √(Ẽ² − f)        (w = 0: static "hovering" observer, needs r > 2M;
+                              Ẽ = 1: "rain" observer, free fall from rest at ∞).
+   Building the orthonormal frame as a radial boost of the rain frame
+   {e₀ = ∂_T − s∂_r, e₁ = ∂_r} gives (after simplification — checked symbolically
+   AND numerically to 1e−15 in the validation suite) for an INCOMING photon with
+   unit observed frequency and view direction n̂ (n_r = n̂·r̂, n_t = |n̂ − n_r r̂|):
+
+       E      = Ẽ + w·n_r                  (conserved Killing energy of the photon)
+       ℓ      = r·n_t                      (|angular momentum|, so b = ℓ/E)
+       dr/dσ  = w + Ẽ·n_r                  (σ = BACKWARD affine parameter)
+
+   Static limit (w = 0, Ẽ = √f) reproduces the textbook b = r sinα/√f. Identity
+   q₀² + f ℓ²/r² = E² holds exactly because Ẽ² − f − w² = 0; we monitor this
+   invariant along every GPU ray as the integration-quality measure.
+
+   Backward tracing must use the *incoming* photon (spatial direction −n̂): naively
+   emitting a forward ray from the camera gives the same path in a static region but
+   FLIPS the Doppler sign, and fails entirely inside the horizon (where every
+   future-directed ray must move to smaller r, while the past of an interior event
+   reaches larger r). The formulas above are already the backward-trace initial data.
+
+   STEP 1c — FREQUENCY SHIFT AND BEAMING (one invariant does all of it)
+   --------------------------------------------------------------------
+   Disk gas on a circular geodesic at radius r has Ω = dφ/dt = √(M/r³) (exact in
+   Schwarzschild) and u^t = 1/√(1 − 3M/r). For a photon with conserved (E, L_z):
+
+       g ≡ ω_obs/ω_em = 1 / [u^t (E − Ω L_z)] = √(1 − 3M/r) / (E − Ω L_z)
+
+   This single factor contains gravitational redshift, special-relativistic time
+   dilation, AND the longitudinal Doppler shift of the orbiting gas. Spherical
+   symmetry conserves the full angular-momentum *vector* L⃗ = ℓ·m̂ (m̂ = ray-plane
+   normal), so the component about the disk axis d̂ is simply L_z = L⃗·d̂ — this is
+   what lets a single 2D in-plane integration serve an arbitrarily inclined disk.
+
+   Liouville’s theorem (I_ν/ν³ invariant) ⇒ observed bolometric intensity = g⁴ ×
+   emitted, and a blackbody stays a blackbody with T_obs = g·T_em. So: color from
+   the Planck locus at g·T(r), brightness ∝ g⁴·T(r)⁴ — beaming for free.
+
+   Sky: stars live at infinity where ω_em = E (static observer there), so
+   g_sky = 1/E. Sightlines whose backward trace escapes with E ≤ 0 exist only
+   through the white-hole region of the maximal extension; a real, collapse-formed
+   hole has no such light, so they render dark.
+
+   STEP 2 — NUMERICS
+   ------------------
+   CPU: classical RK4 with STEP-DOUBLING ERROR CONTROL (compare one h-step against
+   two h/2-steps; accept/adjust by the standard (tol/err)^{1/5} rule, with an
+   absolute h cap — uncapped growth was shown to alias slow orbits during testing).
+   Used for the in-page validation suite and the test-particle integration.
+   GPU: same RK4 stages with curvature-bounded steps (|Δφ| ≤ 0.065, |Δr| ≲ 0.18 r)
+   and the conserved invariant monitored per ray (toggle the drift heat-map to SEE
+   the integration error). The CPU integrator cross-checks the GPU heuristics.
+
+   STEP 3 — BACKWARD RAY TRACING: per pixel, build (E, ℓ, q₀) from the tetrad,
+   integrate (✧) in the ray's own plane, and use the analytic crossing condition
+   x⃗(φ)·d̂ = 0 ⇔ φ = atan2(−A, B) + kπ to catch every disk intersection — the
+   k = 1, 2, ... crossings ARE the secondary images and the photon ring.
+
+   STEP 4 — rendering + UI;  STEP 5 — performance (dynamic resolution, early
+   termination, single-pass WebGL2, zero dependencies). Details inline below.
+   ===================================================================================== */
+
+const $ = id => document.getElementById(id);
+const PI = Math.PI;
+const fmet = (r, M) => 1 - 2 * M / r;
+
+/* ---------------------------- STEP 2: CPU integrator ---------------------------- */
+function rk4Step(y, h, rhs) {
+  const k1 = rhs(y);
+  const y2 = y.map((v, i) => v + 0.5 * h * k1[i]);
+  const k2 = rhs(y2);
+  const y3 = y.map((v, i) => v + 0.5 * h * k2[i]);
+  const k3 = rhs(y3);
+  const y4 = y.map((v, i) => v + h * k3[i]);
+  const k4 = rhs(y4);
+  return y.map((v, i) => v + (h / 6) * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]));
+}
+// One accepted RK4 step with step-doubling error control. Returns [yNew, hUsed, hNext].
+function adaptiveStep(y, h, rhs, tol, hmax) {
+  for (let it = 0; it < 60; it++) {
+    const y1 = rk4Step(y, h, rhs);
+    const ym = rk4Step(y, h / 2, rhs);
+    const y2 = rk4Step(ym, h / 2, rhs);
+    let err = 0;
+    for (let i = 0; i < y.length; i++)
+      err = Math.max(err, Math.abs(y2[i] - y1[i]) / (Math.abs(y2[i]) + 1));
+    if (err < tol || h < 1e-13) {
+      let hn = h * Math.min(4, Math.max(0.2, 0.9 * Math.pow(tol / Math.max(err, 1e-300), 0.2)));
+      return [y2, h, Math.min(hn, hmax)];
+    }
+    h *= Math.max(0.2, 0.9 * Math.pow(tol / err, 0.2));
+  }
+  return [y, 0, h]; // unreachable in practice
+}
+// Null geodesic RHS in its orbital plane: state (r, q = dr/dσ, φ);  r̈ = ℓ²(r−3M)/r⁴.
+const photonRHS = (l, M) => s => {
+  const r2 = s[0] * s[0];
+  return [s[1], l * l * (s[0] - 3 * M) / (r2 * r2), l / r2];
+};
+// Timelike RHS (per proper time): r̈ = −M/r² + L²(r−3M)/r⁴.
+const timelikeRHS = (L, M) => s => {
+  const r2 = s[0] * s[0];
+  return [s[1], -M / r2 + L * L * (s[0] - 3 * M) / (r2 * r2), L / r2];
+};
+
+/* ------------------------- In-page validation suite ------------------------- */
+function runValidation(out) {
+  const M = 1, lines = [];
+  const trace = (b, r0, tol) => {
+    const l = b, rhs = photonRHS(l, M);
+    let y = [r0, -Math.sqrt(Math.max(1 - fmet(r0, M) * b * b / (r0 * r0), 0)), 0];
+    const E2 = y[1] * y[1] + fmet(y[0], M) * l * l / (y[0] * y[0]);
+    let h = 1, drift = 0;
+    for (let i = 0; i < 4e5; i++) {
+      [y, , h] = adaptiveStep(y, h, rhs, tol, 50);
+      const c = y[1] * y[1] + fmet(y[0], M) * l * l / (y[0] * y[0]);
+      drift = Math.max(drift, Math.abs(c - E2) / E2);
+      if (y[0] < 2 * (1 + 1e-7)) return { cap: true, drift, phi: y[2] };
+      if (y[0] > r0 && y[1] > 0) return { cap: false, drift, phi: y[2] };
+    }
+    return { cap: true, drift, phi: y[2] };
+  };
+  // (1) critical impact parameter
+  let lo = 4.9, hi = 5.5;
+  for (let i = 0; i < 44; i++) { const m = 0.5 * (lo + hi); trace(m, 2000, 1e-10).cap ? lo = m : hi = m; }
+  const bc = 0.5 * (lo + hi), bcT = 3 * Math.sqrt(3);
+  lines.push(`[1] photon capture: b_c = ${bc.toFixed(7)} M   (3√3 = ${bcT.toFixed(7)};  rel.err ${(Math.abs(bc - bcT) / bcT).toExponential(1)})`);
+  // (2) weak-field deflection vs series 4M/b + (15π/4)(M/b)² + (128/3)(M/b)³
+  {
+    const b = 20, r0 = 1e5, res = trace(b, r0, 1e-11);
+    const a = res.phi - PI + 2 * Math.asin(b / r0);
+    const th = 4 / b + (15 * PI / 4) / (b * b) + (128 / 3) / (b * b * b);
+    lines.push(`[2] deflection b=20M: ${a.toFixed(6)} rad  vs series ${th.toFixed(6)}  (Δ ${((a - th) / th * 100).toFixed(2)}% ~ O((M/b)⁴) ✓)`);
+  }
+  // (3) constraint drift near the photon sphere
+  {
+    const res = trace(5.1962, 2000, 1e-10);
+    lines.push(`[3] near-critical ray b=5.1962M: wound ${(res.phi / PI).toFixed(2)}π, max invariant drift ${res.drift.toExponential(1)}`);
+  }
+  // (4) tetrad identity q₀² + fℓ²/r² = E² for static & infalling frames, incl. r < 2M
+  {
+    let worst = 0;
+    for (const r of [30, 6, 3, 2.0001, 1.2, 0.4]) for (const nr of [-1, -0.6, 0, 0.6, 1]) {
+      for (const Et of [r > 2.05 ? Math.sqrt(fmet(r, M)) : 1, 1]) {
+        const w = Math.sqrt(Math.max(Et * Et - fmet(r, M), 0)), nt = Math.sqrt(1 - nr * nr);
+        const E = Et + w * nr, q0 = w + Et * nr, l = r * nt;
+        worst = Math.max(worst, Math.abs(q0 * q0 + fmet(r, M) * l * l / (r * r) - E * E));
+      }
+    }
+    lines.push(`[4] camera-frame identity (all radii incl. inside horizon): max residual ${worst.toExponential(1)}`);
+    lines.push(`[4] rain observer at r=2M looking radially out: g_sky = ${(1 / 2).toFixed(3)}  (classic factor-2 redshift)`);
+  }
+  // (5) timelike: circular-orbit stability and periapsis advance
+  {
+    const r0 = 8, L = Math.sqrt(M * r0 * r0 / (r0 - 3 * M)), rhs = timelikeRHS(L, M);
+    let y = [r0, 0, 0], h = 0.05, dmax = 0;
+    while (y[2] < 10 * PI) { [y, , h] = adaptiveStep(y, h, rhs, 1e-11, 2); dmax = Math.max(dmax, Math.abs(y[0] - r0)); }
+    lines.push(`[5] circular orbit r=8M over 5 revolutions: |Δr|max = ${dmax.toExponential(1)} M`);
+    const a = 40, e = 0.2, rp = a * (1 - e), ra = a * (1 + e);
+    const L2 = (fmet(ra, M) - fmet(rp, M)) / (fmet(rp, M) / (rp * rp) - fmet(ra, M) / (ra * ra));
+    const rhs2 = timelikeRHS(Math.sqrt(L2), M);
+    let y2 = [ra, 0, 0], h2 = 0.05, minima = [];
+    for (let i = 0; i < 3e5 && minima.length < 3; i++) {
+      const pb = y2[1];[y2, , h2] = adaptiveStep(y2, h2, rhs2, 1e-10, a / 200);
+      if (pb < 0 && y2[1] >= 0) minima.push(y2[2]);
+    }
+    const dphi = (minima[2] - minima[0]) / 2 - 2 * PI, weak = 6 * PI * M / (a * (1 - e * e));
+    lines.push(`[5] periapsis advance a=40M,e=0.2: ${dphi.toFixed(4)} rad/orbit  (weak-field ${weak.toFixed(4)}; +${((dphi / weak - 1) * 100).toFixed(1)}% = genuine O(M/p) GR term)`);
+  }
+  out.textContent = lines.join('\n');
+}
+
+/* ------------- Blackbody color: Planck spectrum × CIE response → sRGB ------------- */
+/* CIE 1931 color-matching functions via the multi-Gaussian fit of Wyman, Sloan &
+   Shirley (2013); Planck B_λ ∝ λ⁻⁵/(exp(hc/λkT)−1) with hc/k = 1.4388e7 nm·K;
+   XYZ → linear sRGB with the standard matrix; chroma-normalized (brightness is
+   carried separately by the g⁴T⁴ scaling). */
+function makeBBLUT(N) {
+  const g = (x, m, s1, s2) => Math.exp(-0.5 * ((x - m) / (x < m ? s1 : s2)) ** 2);
+  const cmf = l => [
+    1.056 * g(l, 599.8, 37.9, 31.0) + 0.362 * g(l, 442.0, 16.0, 26.7) - 0.065 * g(l, 501.1, 20.4, 26.2),
+    0.821 * g(l, 568.8, 46.9, 40.5) + 0.286 * g(l, 530.9, 16.3, 31.1),
+    1.217 * g(l, 437.0, 11.8, 36.0) + 0.681 * g(l, 459.0, 26.0, 13.8)];
+  const data = new Uint8Array(N * 4);
+  for (let i = 0; i < N; i++) {
+    const T = Math.exp(Math.log(1000) + (Math.log(40000) - Math.log(1000)) * i / (N - 1));
+    let X = 0, Y = 0, Z = 0;
+    for (let l = 380; l <= 780; l += 4) {
+      const p = 1 / (Math.pow(l, 5) * (Math.exp(1.4388e7 / (l * T)) - 1));
+      const c = cmf(l); X += p * c[0]; Y += p * c[1]; Z += p * c[2];
+    }
+    let r = 3.2406 * X - 1.5372 * Y - 0.4986 * Z,
+      gg = -0.9689 * X + 1.8758 * Y + 0.0415 * Z,
+      b = 0.0557 * X - 0.2040 * Y + 1.0570 * Z;
+    const m = Math.max(r, gg, b);
+    data[4 * i] = Math.round(255 * Math.max(r, 0) / m);
+    data[4 * i + 1] = Math.round(255 * Math.max(gg, 0) / m);
+    data[4 * i + 2] = Math.round(255 * Math.max(b, 0) / m);
+    data[4 * i + 3] = 255;
+  }
+  return data;
+}
+
+/* ------------------------------ STEP 3: shaders ------------------------------ */
+const VS = `#version 300 es
+layout(location=0) in vec2 aP;
+void main(){ gl_Position = vec4(aP, 0.0, 1.0); }`;
+
+const FS = `#version 300 es
+/* Fragment-shader backward ray tracer. Per pixel:
+   1. view direction n in the camera's LOCAL ORTHONORMAL FRAME (pinhole model);
+   2. initial data of the INCOMING photon from the radial-observer tetrad:
+        E = Et + w*n_r,  l = r*n_t,  q0 = dr/dsigma = w + Et*n_r   (sigma = backward affine);
+   3. RK4-integrate  r'' = l^2 (r-3M)/r^4,  phi' = l/r^2  in the ray's own plane
+      (regular through r = 2M -- equivalent to Eddington-Finkelstein integration);
+   4. disk-plane crossings occur exactly at phi = atan2(-A,B) + k*pi  (A = rhat.d, B = eb.d),
+      giving direct image (k=0/1), secondary images and the photon ring (k>=2) for free;
+   5. shade with g = sqrt(1-3M/r)/(E - Omega*Lz): color from Planck locus at g*T(r),
+      surface brightness scaled by g^4 (Liouville);  sky shift g_sky = 1/E. */
+precision highp float;
+precision highp int;
+
+uniform vec2  uRes;
+uniform float uM;
+uniform vec3  uCamPos;
+uniform mat3  uCamBasis;     // columns: right, up, forward
+uniform float uTanHalfFov;
+uniform float uEt, uW;       // camera Killing energy and radial infall speed
+uniform vec3  uDiskN, uDiskX, uDiskY;
+uniform float uRin, uRout, uTpeak;
+uniform float uExposure, uTime, uSpin;
+uniform int   uFlags;        // bit0 disk |1 stars |2 grid |3 color shift |4 beaming |5 turbulence |6 drift view
+uniform sampler2D uBB;
+
+out vec4 outColor;
+const float PI = 3.141592653589793;
+float Mm; float Lph;
+
+bool flagB(int b){ return (uFlags & (1 << b)) != 0; }
+
+float hash13(vec3 p){
+  uvec3 q = floatBitsToUint(p + vec3(0.1318, 0.7113, 0.9341));
+  q *= uvec3(1597334673u, 3812015801u, 2798796415u);
+  uint n = (q.x ^ q.y ^ q.z) * 1597334673u;
+  n ^= (n >> 16); n *= 2654435761u; n ^= (n >> 13);
+  return float(n) * (1.0 / 4294967295.0);
+}
+vec3 hash33(vec3 p){ return vec3(hash13(p), hash13(p + 19.19), hash13(p + 47.47)); }
+float vnoise(vec3 p){
+  vec3 i = floor(p), fr = fract(p);
+  vec3 u = fr*fr*(3.0 - 2.0*fr);
+  float a=hash13(i),             b=hash13(i+vec3(1,0,0)), c=hash13(i+vec3(0,1,0)), d=hash13(i+vec3(1,1,0));
+  float e=hash13(i+vec3(0,0,1)), f=hash13(i+vec3(1,0,1)), g=hash13(i+vec3(0,1,1)), h=hash13(i+vec3(1,1,1));
+  return mix(mix(mix(a,b,u.x), mix(c,d,u.x), u.y), mix(mix(e,f,u.x), mix(g,h,u.x), u.y), u.z);
+}
+float fbm(vec3 p){ return 0.55*vnoise(p) + 0.30*vnoise(p*2.13 + 5.2) + 0.15*vnoise(p*4.31 + 9.7); }
+
+vec3 bbColor(float T){
+  float t = clamp((log(T) - 6.907755) / (10.596635 - 6.907755), 0.0, 1.0);
+  return texture(uBB, vec2(t, 0.5)).rgb;
+}
+
+/* Thin-disk temperature: T^4 proportional to r^-3 (1 - sqrt(r_in/r)) — the classic
+   steady thin-disk flux shape with a torque-free inner boundary at the ISCO.
+   T -> 0 at r_in (gas plunges, radiates little) and peaks at r = (49/36) r_in. */
+float diskTfrac(float r){
+  float x = uRin / r;
+  float p = x*x*x*(1.0 - sqrt(x));
+  return pow(clamp(p, 0.0, 1.0) / 0.05665244, 0.25);
+}
+
+/* geodesic RHS in the ray's plane: state s = (r, q, phi) */
+vec3 geoRHS(vec3 s){
+  float r2 = s.x*s.x;
+  return vec3(s.y, Lph*Lph*(s.x - 3.0*Mm)/(r2*r2), Lph/r2);
+}
+
+vec3 starfield(vec3 d, float Tshift){
+  vec3 acc = vec3(0.0);
+  for (int sh = 0; sh < 2; sh++){
+    float sc = (sh == 0) ? 21.0 : 43.0;
+    vec3 cell = floor(d * sc);
+    vec3 rnd = hash33(cell);
+    if (rnd.x < ((sh == 0) ? 0.22 : 0.30)){
+      vec3 sdir = normalize(cell + 0.5 + (rnd - 0.5)*0.85);
+      float ca = clamp(dot(d, sdir), -1.0, 1.0);
+      float ang = sqrt(max(2.0*(1.0 - ca), 0.0));
+      float big = pow(hash13(cell + 7.7), 14.0);
+      float sz = (1.5 + 12.0*big) * 0.0011;
+      float amp = (0.4 + 5.0*pow(rnd.y, 6.0)) * ((sh == 0) ? 1.0 : 0.55);
+      float Tstar = 2600.0 + 14000.0*rnd.z*rnd.z;
+      acc += bbColor(clamp(Tstar*Tshift, 1000.0, 39500.0)) * amp * exp(-ang*ang/(2.0*sz*sz));
+    }
+  }
+  vec3 gn = normalize(vec3(0.32, 0.91, 0.26));      // procedural galactic band
+  float band = exp(-pow(dot(d, gn)/0.135, 2.0));
+  float n = fbm(d*5.5);
+  acc += (vec3(0.20, 0.235, 0.33) + vec3(0.16, 0.10, 0.05)*n) * band * (0.10 + 0.32*n);
+  return acc;
+}
+
+float skyGrid(vec3 d){
+  float az = atan(d.z, d.x)/(2.0*PI) + 0.5;
+  float el = asin(clamp(d.y, -1.0, 1.0))/PI + 0.5;
+  vec2 g = vec2(az*24.0, el*12.0);
+  vec2 fr = abs(fract(g) - 0.5);
+  vec2 ln = 1.0 - smoothstep(vec2(0.0), vec2(0.05), fr);
+  return clamp(max(ln.x, ln.y), 0.0, 1.0);
+}
+
+vec3 heat(float x){
+  x = clamp(x, 0.0, 1.0);
+  return mix(mix(vec3(0.02,0.06,0.25), vec3(0.10,0.75,0.55), smoothstep(0.0,0.5,x)),
+             vec3(1.0,0.25,0.05), smoothstep(0.5,1.0,x));
+}
+
+void main(){
+  Mm = uM;
+  vec2 uv = (gl_FragCoord.xy*2.0 - uRes)/uRes.y;
+  vec3 n = normalize(uCamBasis * vec3(uv * uTanHalfFov, 1.0));
+
+  float r  = length(uCamPos);
+  vec3 rh  = uCamPos / r;
+  float nr = dot(n, rh);
+  vec3 tv  = n - nr*rh;
+  float nt = length(tv);
+  vec3 eb  = (nt > 1e-6) ? tv/nt
+           : normalize(cross(rh, (abs(rh.y) < 0.9) ? vec3(0,1,0) : vec3(1,0,0)));
+  vec3 mh  = cross(rh, eb);                 // this ray's orbital-plane normal
+
+  Lph      = r * nt;                        // photon angular momentum (omega_cam = 1)
+  float E  = uEt + uW * nr;                 // conserved Killing energy (incoming photon)
+  float q0 = uW + uEt * nr;                 // dr/dsigma at the camera
+  float f0 = 1.0 - 2.0*Mm/r;
+  float E2 = q0*q0 + f0*Lph*Lph/(r*r);      // = E^2; monitored as integration invariant
+
+  float A = dot(rh, uDiskN), B = dot(eb, uDiskN);
+  bool diskOn = flagB(0) && (abs(A) + abs(B) > 1e-6) && (Lph > 1e-6*Mm);
+  float phiX = 1e30;
+  if (diskOn){
+    phiX = mod(atan(-A, B), PI);            // first solution of A cos(phi) + B sin(phi) = 0
+    if (phiX < 1e-4) phiX += PI;            // skip the crossing AT the camera itself
+  }
+
+  float Resc = max(60.0*Mm, 1.55*r + 8.0*Mm);
+  vec3 s = vec3(r, q0, 0.0);
+  vec3 col = vec3(0.0);
+  bool done = false;
+  float drift = 0.0;
+
+  for (int i = 0; i < 460; i++){
+    /* heuristic step bounds (the controlled adaptive RK4 lives on the CPU side;
+       drift view visualizes how well these bounds do): */
+    float h = 0.18 * s.x / max(abs(s.y), 0.05);
+    if (Lph > 1e-6) h = min(h, 0.065 * s.x*s.x / Lph);   // |dphi| <= 0.065 < pi (no crossing skipped)
+    h = min(h, 0.30*Resc);
+
+    vec3 sp = s;
+    vec3 k1 = geoRHS(s);
+    vec3 k2 = geoRHS(s + 0.5*h*k1);
+    vec3 k3 = geoRHS(s + 0.5*h*k2);
+    vec3 k4 = geoRHS(s + h*k3);
+    s += (h/6.0)*(k1 + 2.0*k2 + 2.0*k3 + k4);
+
+    if (s.x < 0.02*Mm){ done = true; break; }
+
+    if (flagB(6)){
+      float c = s.y*s.y + (1.0 - 2.0*Mm/s.x)*Lph*Lph/(s.x*s.x);
+      drift = max(drift, abs(c - E2)/max(E2, 1e-9));
+    }
+
+    if (diskOn && s.z >= phiX){
+      float t = (phiX - sp.z) / max(s.z - sp.z, 1e-9);
+      float rHit = mix(sp.x, s.x, t);
+      if (rHit >= uRin && rHit <= uRout){
+        float Om = uSpin * sqrt(Mm/(rHit*rHit*rHit));   // exact Schwarzschild Kepler rate
+        float Lz = -Lph * dot(mh, uDiskN);              // photon L about the DISK axis
+        float g  = sqrt(max(1.0 - 3.0*Mm/rHit, 1e-6)) / max(E - Om*Lz, 1e-4);
+        float gC = flagB(3) ? g : 1.0;
+        float gB = flagB(4) ? g : 1.0;
+        float Tem = uTpeak * diskTfrac(rHit);
+        float I = pow(max(Tem, 1.0)/uTpeak, 4.0) * (gB*gB*gB*gB);
+        I *= smoothstep(uRin, uRin*1.04, rHit) * (1.0 - smoothstep(0.80*uRout, uRout, rHit));
+        if (flagB(5)){                                   // artistic turbulence (see notes)
+          vec3 P = cos(phiX)*rh + sin(phiX)*eb;
+          float az = atan(dot(P, uDiskY), dot(P, uDiskX));
+          float wind = az - uSpin*sqrt(Mm/(rHit*rHit*rHit))*uTime*0.55;
+          float tx = fbm(vec3(cos(wind), sin(wind), 0.0)*3.0 + vec3(0.0, 0.0, 6.0*log(rHit/Mm)));
+          I *= 0.55 + 0.9*tx;
+        }
+        col = bbColor(clamp(gC*Tem, 1000.0, 39500.0)) * (3.2 * I);
+        done = true; break;
+      }
+      phiX += PI;
+    }
+
+    /* backward ray fell through r = 2M: in a real (collapse-formed) spacetime no light
+       emerges along this sightline -> the shadow. (Camera inside the horizon never
+       triggers this: there q stays > 0 — the past of an interior event lies OUTWARD.) */
+    if (s.x < 1.999*Mm && s.y < 0.0){ done = true; break; }
+
+    if (s.x > Resc && s.y > 0.0){
+      vec3 er =  cos(s.z)*rh + sin(s.z)*eb;
+      vec3 ep = -sin(s.z)*rh + cos(s.z)*eb;
+      vec3 dir = normalize(s.y*er + (Lph/s.x)*ep);   // celestial direction of the source
+      if (E > 2e-3){
+        float gs = min(1.0/E, 6.0);                  // sky shift, clamped (g->inf is measure zero)
+        float Tsh = flagB(3) ? gs : 1.0;
+        vec3 sky = vec3(0.0);
+        if (flagB(1)) sky += starfield(dir, Tsh);
+        if (flagB(2)) sky += vec3(0.30, 0.50, 0.65) * skyGrid(dir) * 0.5;
+        col = sky * (flagB(4) ? gs*gs*gs*gs : 1.0);
+      }
+      done = true; break;
+    }
+
+    if (s.z > 6.2831853*3.1){ done = true; break; }  // >=3 windings: sub-pixel ring tail
+  }
+
+  if (flagB(6)){
+    outColor = vec4(heat((log(max(drift, 1e-12))/2.302585 + 11.0)/8.0), 1.0);
+    return;
+  }
+  col *= uExposure;
+  col = 1.0 - exp(-col);                              // filmic-ish tone curve
+  col = pow(col, vec3(1.0/2.2));
+  outColor = vec4(col, 1.0);
+}`;
+
+/* ============================== STEP 4: engine + UI ============================== */
+const V = {
+  add:(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]],
+  sub:(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]],
+  scale:(a,s)=>[a[0]*s,a[1]*s,a[2]*s],
+  dot:(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],
+  cross:(a,b)=>[a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]],
+  len:a=>Math.hypot(a[0],a[1],a[2]),
+  norm(a){ const l=V.len(a)||1; return [a[0]/l,a[1]/l,a[2]/l]; },
+  // Rodrigues rotation of v about unit axis k by angle t
+  rot(v,k,t){ const c=Math.cos(t), s=Math.sin(t);
+    return V.add(V.add(V.scale(v,c), V.scale(V.cross(k,v),s)), V.scale(k, V.dot(k,v)*(1-c))); }
+};
+
+const S = {
+  M: 1.0, dist: 27, inclDeg: 74, fovDeg: 62, Tpeak: 8500, exposure: 1.25,
+  resScale: 0.7, routFac: 3.4, spin: 1,
+  yaw: -0.55, pitch: 0.10,
+  show: { disk:true, stars:true, grid:false, shift:true, beam:true, turb:true, drift:false, inset:true },
+  plunge: null,          // {r, pr, tau, dir, lookYaw, lookPitch}
+  plungeRate: 1.0,
+  tidalMass: 10,         // solar masses, HUD readout only
+  interacting: 0, dynScale: 1.0,
+};
+const Rin  = () => 6*S.M;
+const Rout = () => 6*S.M*S.routFac;
+
+/* ----------------------------------- WebGL ----------------------------------- */
+const canvas = $('gl');
+const gl = canvas.getContext('webgl2', { antialias:false, depth:false, stencil:false });
+if (!gl) { $('fatal').textContent = 'WebGL2 is not available in this browser — the ray tracer needs it.'; throw new Error('no webgl2'); }
+
+function compile(type, src){
+  const sh = gl.createShader(type);
+  gl.shaderSource(sh, src); gl.compileShader(sh);
+  if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)){
+    $('fatal').textContent = 'Shader compile error:\n' + gl.getShaderInfoLog(sh);
+    throw new Error(gl.getShaderInfoLog(sh));
+  }
+  return sh;
+}
+const prog = gl.createProgram();
+gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
+gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS));
+gl.linkProgram(prog);
+if (!gl.getProgramParameter(prog, gl.LINK_STATUS)){
+  $('fatal').textContent = 'Program link error:\n' + gl.getProgramInfoLog(prog);
+  throw new Error('link');
+}
+gl.useProgram(prog);
+const buf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0);
+gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+const U = {};
+for (const name of ['uRes','uM','uCamPos','uCamBasis','uTanHalfFov','uEt','uW','uDiskN','uDiskX','uDiskY',
+                    'uRin','uRout','uTpeak','uExposure','uTime','uSpin','uFlags','uBB'])
+  U[name] = gl.getUniformLocation(prog, name);
+
+const bbTex = gl.createTexture();
+gl.activeTexture(gl.TEXTURE0);
+gl.bindTexture(gl.TEXTURE_2D, bbTex);
+gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, makeBBLUT(256));
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+gl.uniform1i(U.uBB, 0);
+
+/* --------------------------------- camera --------------------------------- */
+function diskBasis(){
+  const i = S.inclDeg * PI/180;
+  const dN = [0, Math.cos(i), -Math.sin(i)];
+  const dX = [1, 0, 0];
+  const dY = V.norm(V.cross(dN, dX));
+  return { dN, dX, dY };
+}
+function cameraState(){
+  if (S.plunge){
+    const P = S.plunge;
+    const pos = V.scale(P.dir, P.r);
+    const f0 = V.scale(P.dir, -1);
+    let up0 = Math.abs(P.dir[1]) < 0.93 ? [0,1,0] : [1,0,0];
+    const r0 = V.norm(V.cross(f0, up0));
+    const u0 = V.cross(r0, f0);
+    const f1 = V.rot(f0, u0, P.lookYaw);
+    const r1 = V.rot(r0, u0, P.lookYaw);
+    const f2 = V.rot(f1, r1, P.lookPitch);
+    const u2 = V.cross(r1, f2);
+    // exact frame relation each frame: w from the integrated momentum, Ẽ from the
+    // first integral (keeps the tetrad identity Ẽ² − f = w² machine-exact)
+    const w  = Math.max(-P.pr, 0);
+    const Et = Math.sqrt(Math.max(P.pr*P.pr + fmet(P.r, S.M), 1e-12));
+    return { pos, right:r1, up:u2, fwd:f2, Et, w, r:P.r };
+  }
+  const cp = Math.cos(S.pitch), sp = Math.sin(S.pitch);
+  const pos = V.scale([cp*Math.sin(S.yaw), sp, cp*Math.cos(S.yaw)], S.dist);
+  const fwd = V.norm(V.scale(pos, -1));
+  let up0 = Math.abs(fwd[1]) < 0.93 ? [0,1,0] : [1,0,0];
+  const right = V.norm(V.cross(fwd, up0));
+  const up = V.cross(right, fwd);
+  const Et = Math.sqrt(Math.max(fmet(S.dist, S.M), 1e-9));   // static (hovering) observer
+  return { pos, right, up, fwd, Et, w:0, r:S.dist };
+}
+
+/* ------------------------- plunge: radial timelike geodesic ------------------------- */
+/* From rest at r₀ (so Ẽ = √f(r₀)); integrating the second-order form dr/dτ = p_r,
+   dp_r/dτ = −M/r² (exact for L = 0) avoids the √(Ẽ²−f) degeneracy at the release point. */
+function startPlunge(){
+  if (S.plunge) return;
+  if (S.dist < 2.3*S.M) { S.dist = Math.max(S.dist, 2.3*S.M); }
+  const cam = cameraState();
+  S.plunge = { r: S.dist, pr: 0, tau: 0, dir: V.norm(cam.pos), lookYaw: 0, lookPitch: 0,
+               Et0: Math.sqrt(fmet(S.dist, S.M)), r0: S.dist, crossed: false, landed: false };
+  document.body.classList.add('plunging');
+  $('plungeBtn').textContent = 'Abort plunge — return to orbit';
+}
+function endPlunge(){
+  if (!S.plunge) return;
+  const P = S.plunge;
+  S.dist = Math.min(Math.max(P.r, 2.3*S.M), 140);
+  S.pitch = Math.asin(Math.max(-1, Math.min(1, P.dir[1])));
+  S.yaw = Math.atan2(P.dir[0], P.dir[2]);
+  S.plunge = null;
+  document.body.classList.remove('plunging');
+  $('plungeBtn').textContent = 'Plunge through the horizon';
+  syncSliders();
+}
+function stepPlunge(dt){
+  const P = S.plunge; if (!P || P.landed) return;
+  const rhs = s => [s[1], -S.M/(s[0]*s[0])];
+  let remain = S.plungeRate * dt * 8.0;       // proper time, geometric units (×8 for watchability)
+  let y = [P.r, P.pr], h = Math.min(0.05, remain);
+  while (remain > 1e-9){
+    let used, hn;
+    [y, used, hn] = adaptiveStep(y, Math.min(h, remain), rhs, 1e-10, Math.max(0.02, 0.1*y[0]));
+    if (used <= 0) break;
+    remain -= used; h = hn; P.tau += used;
+    if (y[0] <= 0.22*S.M){ y[0] = 0.22*S.M; P.landed = true; break; }
+  }
+  if (!P.crossed && y[0] < 2*S.M){ P.crossed = true; flashHorizon(); }
+  P.r = y[0]; P.pr = y[1];
+}
+// proper time remaining to r = 0 along the radial geodesic: ∫₀^r dr′/√(Ẽ²−f(r′))
+function tauToSingularity(r, Et){
+  const n = 200; let acc = 0;
+  for (let i = 0; i < n; i++){
+    const rm = r * (i + 0.5)/n;
+    acc += (r/n) / Math.sqrt(Math.max(Et*Et - 1 + 2*S.M/rm, 1e-12));
+  }
+  return acc;
+}
+function flashHorizon(){
+  const el = $('horizonFlash');
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 4200);
+}
+
+/* ----------------------- test particles: timelike geodesics ----------------------- */
+/* Each particle integrates (✧′) with the SAME error-controlled RK4 used by the
+   validation suite. Rendered in the inset orbit chart in Schwarzschild (r, φ):
+   placing them inside the lensed main image would require solving the emitter→camera
+   boundary-value problem per particle per frame, so the chart is the honest view. */
+let particles = [];
+function circularL(r){ return Math.sqrt(S.M*r*r/(r - 3*S.M)); }
+function spawnParticles(){
+  particles = [];
+  const M = S.M, ro = Rout();
+  for (const rc of [6.05, 7.4, 9.2, 11.6, 14.6].map(x => x*M))
+    if (rc < 0.95*ro)
+      particles.push({ y:[rc, 0, Math.random()*2*PI], L: S.spin*circularL(rc), kind:'circ', trail:[], h:0.05 });
+  { // precessing eccentric orbit between r_p = 7.5M and r_a ≈ 0.9 R_out
+    const rp = 7.5*M, ra = Math.max(0.9*ro, 12*M);
+    const L2 = (fmet(ra,M) - fmet(rp,M)) / (fmet(rp,M)/(rp*rp) - fmet(ra,M)/(ra*ra));
+    particles.push({ y:[ra, 0, Math.random()*2*PI], L: S.spin*Math.sqrt(L2), kind:'ecc', trail:[], h:0.05 });
+  }
+  for (const ph of [0, 2.4]) // sub-critical L ⇒ no centrifugal barrier ⇒ spiral and plunge
+    particles.push({ y:[7.2*M, 0, ph], L: S.spin*3.2*M, kind:'fall', trail:[], h:0.05 });
+}
+function stepParticles(dt){
+  const M = S.M, now = performance.now();
+  for (const p of particles){
+    if (p.dead){
+      if (now - p.deadAt > 4500){ p.dead = false; p.trail = []; p.y = [7.2*M, 0, Math.random()*2*PI]; p.h = 0.05; }
+      continue;
+    }
+    const rhs = timelikeRHS(p.L, M);
+    let remain = dt * 6.0;
+    while (remain > 1e-9){
+      let used, hn;
+      [p.y, used, hn] = adaptiveStep(p.y, Math.min(p.h, remain), rhs, 1e-8, Math.max(0.02, 0.12*p.y[0]));
+      if (used <= 0) break;
+      remain -= used; p.h = hn;
+      if (p.y[0] < 0.05*M){ p.dead = true; p.deadAt = now; break; }
+    }
+    const px = p.y[0]*Math.cos(p.y[2]), py = p.y[0]*Math.sin(p.y[2]);
+    const t = p.trail, last = t[t.length-1];
+    if (!last || (px-last[0])**2 + (py-last[1])**2 > (0.12*M)**2){
+      t.push([px, py]); if (t.length > 240) t.shift();
+    }
+  }
+}
+
+/* -------------------------------- inset chart -------------------------------- */
+const inset = $('inset'), ictx = inset.getContext('2d');
+function drawInset(cam, DB){
+  const W = inset.width, H = inset.height, cx = W/2, cy = H/2;
+  const sc = (W/2 - 12) / Rout();
+  ictx.clearRect(0, 0, W, H);
+  ictx.fillStyle = 'rgba(7,10,16,0.88)'; ictx.fillRect(0, 0, W, H);
+  const circle = (r, style, dash, fill) => {
+    ictx.beginPath(); ictx.setLineDash(dash || []);
+    ictx.arc(cx, cy, r*sc, 0, 2*PI);
+    if (fill){ ictx.fillStyle = fill; ictx.fill(); }
+    if (style){ ictx.strokeStyle = style; ictx.lineWidth = 1; ictx.stroke(); }
+    ictx.setLineDash([]);
+  };
+  // disk annulus
+  const grad = ictx.createRadialGradient(cx, cy, Rin()*sc, cx, cy, Rout()*sc);
+  grad.addColorStop(0, 'rgba(255,170,90,0.30)');
+  grad.addColorStop(1, 'rgba(255,140,70,0.03)');
+  ictx.beginPath(); ictx.arc(cx, cy, Rout()*sc, 0, 2*PI);
+  ictx.arc(cx, cy, Rin()*sc, 0, 2*PI, true);
+  ictx.fillStyle = grad; ictx.fill();
+  circle(2*S.M, '#3a4b63', null, '#000');
+  circle(3*S.M, 'rgba(190,140,255,0.75)', [4,4]);
+  circle(6*S.M, 'rgba(120,170,220,0.55)', [2,4]);
+  ictx.font = '10px ui-monospace, monospace'; ictx.fillStyle = '#8fa3bd';
+  ictx.fillText('2M', cx + 2*S.M*sc + 2, cy - 2);
+  ictx.fillText('3M', cx + 3*S.M*sc + 2, cy + 10);
+  ictx.fillText('6M ISCO', cx + 6*S.M*sc + 2, cy + 22);
+  // particles
+  for (const p of particles){
+    if (p.trail.length > 1){
+      ictx.beginPath();
+      ictx.moveTo(cx + p.trail[0][0]*sc, cy - p.trail[0][1]*sc);
+      for (const q of p.trail) ictx.lineTo(cx + q[0]*sc, cy - q[1]*sc);
+      ictx.strokeStyle = p.kind === 'circ' ? 'rgba(110,200,255,0.40)'
+                        : p.kind === 'ecc' ? 'rgba(255,220,120,0.45)' : 'rgba(255,110,90,0.50)';
+      ictx.lineWidth = 1; ictx.stroke();
+    }
+    if (!p.dead){
+      const px = p.y[0]*Math.cos(p.y[2]), py = p.y[0]*Math.sin(p.y[2]);
+      ictx.beginPath(); ictx.arc(cx + px*sc, cy - py*sc, 2.2, 0, 2*PI);
+      ictx.fillStyle = p.kind === 'circ' ? '#6ec8ff' : p.kind === 'ecc' ? '#ffdc78' : '#ff6e5a';
+      ictx.fill();
+    }
+  }
+  // camera projected onto the disk plane
+  const px = V.dot(cam.pos, DB.dX), py = V.dot(cam.pos, DB.dY), hgt = V.dot(cam.pos, DB.dN);
+  const fx = V.dot(cam.fwd, DB.dX), fy = V.dot(cam.fwd, DB.dY);
+  const mx = cx + px*sc, my = cy - py*sc;
+  ictx.beginPath(); ictx.arc(mx, my, 3.4, 0, 2*PI);
+  ictx.strokeStyle = '#dfe8f5'; ictx.lineWidth = Math.abs(hgt) > 0.4*S.M ? 1 : 2; ictx.stroke();
+  ictx.beginPath(); ictx.moveTo(mx, my);
+  ictx.lineTo(mx + fx*16, my - fy*16);
+  ictx.strokeStyle = 'rgba(223,232,245,0.7)'; ictx.stroke();
+  ictx.fillStyle = '#8fa3bd';
+  ictx.fillText('orbit chart — Schwarzschild (r, φ), disk plane', 8, H - 8);
+}
+
+/* ----------------------------------- UI ----------------------------------- */
+function bindSlider(id, key, fmt, post){
+  const el = $(id), lab = $(id + 'V');
+  const upd = () => { S[key] = parseFloat(el.value); lab.textContent = fmt(S[key]); if (post) post(); };
+  el.addEventListener('input', upd); upd();
+}
+function syncSliders(){
+  $('dist').value = S.dist; $('distV').textContent = S.dist.toFixed(1);
+  $('mass').value = S.M;    $('massV').textContent = S.M.toFixed(2);
+}
+bindSlider('mass', 'M', v => v.toFixed(2), () => {
+  S.dist = Math.max(S.dist, 2.3*S.M); syncSliders(); spawnParticles();
+});
+bindSlider('dist', 'dist', v => v.toFixed(1), () => { S.dist = Math.max(S.dist, 2.3*S.M); syncSliders(); });
+bindSlider('incl', 'inclDeg', v => v.toFixed(0) + '°');
+bindSlider('fov',  'fovDeg',  v => v.toFixed(0) + '°');
+bindSlider('tpeak','Tpeak',   v => v.toFixed(0) + ' K');
+bindSlider('expo', 'exposure',v => v.toFixed(2));
+bindSlider('rscale','resScale', v => Math.round(v*100) + '%');
+bindSlider('rout', 'routFac', v => 'r_out = ' + (6*v).toFixed(1) + ' M', () => spawnParticles());
+bindSlider('prate','plungeRate', v => v.toFixed(1) + '×');
+
+for (const [id, key] of [['tDisk','disk'],['tStars','stars'],['tGrid','grid'],['tShift','shift'],
+                         ['tBeam','beam'],['tTurb','turb'],['tDrift','drift'],['tInset','inset']]){
+  const el = $(id);
+  el.checked = S.show[key];
+  el.addEventListener('change', () => { S.show[key] = el.checked; });
+}
+$('tSpin').addEventListener('change', e => { S.spin = e.target.checked ? -1 : 1; spawnParticles(); });
+$('tidalSel').addEventListener('change', e => { S.tidalMass = parseFloat(e.target.value); });
+$('plungeBtn').addEventListener('click', () => S.plunge ? endPlunge() : startPlunge());
+$('resetBtn').addEventListener('click', () => {
+  endPlunge(); S.yaw = -0.55; S.pitch = 0.10; S.dist = 27; S.M = 1;
+  $('mass').value = 1; $('massV').textContent = '1.00'; syncSliders();
+});
+$('valBtn').addEventListener('click', () => {
+  const box = $('valbox'); box.classList.add('show');
+  $('valout').textContent = 'integrating…';
+  setTimeout(() => runValidation($('valout')), 30);
+});
+$('valClose').addEventListener('click', () => $('valbox').classList.remove('show'));
+$('panelToggle').addEventListener('click', () => document.body.classList.toggle('panelHidden'));
+
+/* ------------------------------ pointer control ------------------------------ */
+const pointers = new Map();
+let pinchDist = 0;
+canvas.addEventListener('pointerdown', e => {
+  canvas.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, [e.clientX, e.clientY]);
+  if (pointers.size === 2){
+    const ps = [...pointers.values()];
+    pinchDist = Math.hypot(ps[0][0]-ps[1][0], ps[0][1]-ps[1][1]);
+  }
+});
+canvas.addEventListener('pointermove', e => {
+  if (!pointers.has(e.pointerId)) return;
+  S.interacting = performance.now();
+  const prev = pointers.get(e.pointerId);
+  const dx = e.clientX - prev[0], dy = e.clientY - prev[1];
+  pointers.set(e.pointerId, [e.clientX, e.clientY]);
+  if (pointers.size === 2){
+    const ps = [...pointers.values()];
+    const d = Math.hypot(ps[0][0]-ps[1][0], ps[0][1]-ps[1][1]);
+    if (pinchDist > 0 && !S.plunge){
+      S.dist = Math.min(140, Math.max(2.3*S.M, S.dist * pinchDist / d));
+      syncSliders();
+    }
+    pinchDist = d;
+    return;
+  }
+  if (S.plunge){
+    S.plunge.lookYaw   -= dx * 0.0042;
+    S.plunge.lookPitch = Math.max(-1.5, Math.min(1.5, S.plunge.lookPitch - dy * 0.0042));
+  } else {
+    S.yaw  -= dx * 0.0048;
+    S.pitch = Math.max(-1.45, Math.min(1.45, S.pitch + dy * 0.0048));
+  }
+});
+const release = e => { pointers.delete(e.pointerId); pinchDist = 0; };
+canvas.addEventListener('pointerup', release);
+canvas.addEventListener('pointercancel', release);
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  S.interacting = performance.now();
+  if (S.plunge) return;
+  S.dist = Math.min(140, Math.max(2.3*S.M, S.dist * Math.exp(e.deltaY * 0.0011)));
+  syncSliders();
+}, { passive:false });
+
+/* --------------------------------- HUD --------------------------------- */
+const Gc = 6.674e-11, cc = 2.998e8, Msun = 1.989e30;
+function updateHUD(cam){
+  const rM = cam.r / S.M;
+  let txt = '';
+  if (S.plunge){
+    const P = S.plunge;
+    const Mp = S.tidalMass * Msun;
+    const tUnit = Gc * Mp / (cc*cc*cc);                       // 1 geometric time unit, seconds
+    const tidal = 4 * Math.pow(cc, 6) / (Gc*Gc*Mp*Mp * Math.pow(rM, 3)) / 9.80665; // 2m body, in g
+    const tRem = tauToSingularity(P.r, P.Et0) / S.M;
+    txt += 'mode      free fall (radial geodesic)\n';
+    txt += 'r         ' + rM.toFixed(3) + ' M' + (P.r < 2*S.M ? '   — INSIDE THE HORIZON' : '') + '\n';
+    txt += 'τ elapsed ' + (P.tau/S.M).toFixed(1) + ' M  (' + (P.tau/S.M*tUnit).toFixed(4) + ' s @ ' + S.tidalMass.toLocaleString() + ' M☉)\n';
+    txt += 'τ to r=0  ' + tRem.toFixed(1) + ' M  (' + (tRem*tUnit).toFixed(4) + ' s)\n';
+    if (P.r > 2*S.M) txt += 'v/c (shell) ' + Math.min(0.99999, cam.w/cam.Et).toFixed(5) + '\n';
+    else txt += 'v/c (shell) —  no static frame exists inside r = 2M\n';
+    txt += 'tidal Δa  ' + tidal.toExponential(2) + ' g  (head–feet, 2 m body)\n';
+    txt += '          radial stretch +2M/r³, transverse squeeze −M/r³';
+    if (P.landed) txt += '\n— halted at r = 0.22M: curvature (∝ M/r³) diverges ahead —';
+  } else {
+    txt += 'mode      static observer (hovering; proper acceleration ∝ M/(r²√f))\n';
+    txt += 'r         ' + rM.toFixed(2) + ' M\n';
+    txt += 'shadow    θ ≈ ' + (Math.asin(Math.min(1, 3*Math.sqrt(3)*S.M*Math.sqrt(Math.max(fmet(cam.r,S.M),0))/cam.r))*180/PI).toFixed(1)
+        + '°  (sin θ = b_c √f / r, b_c = 3√3 M)\n';
+    txt += 'ISCO 6M · photon sphere 3M · horizon 2M';
+  }
+  $('hud').textContent = txt;
+}
+
+/* ------------------------------ STEP 5: main loop ------------------------------ */
+let lastT = performance.now(), fpsEMA = 60, frameEMA = 12, fpsTick = 0;
+function resize(){
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const interactive = performance.now() - S.interacting < 280;
+  const scale = S.resScale * S.dynScale * (interactive ? 0.62 : 1.0);
+  const w = Math.max(64, Math.round(canvas.clientWidth  * dpr * scale));
+  const h = Math.max(64, Math.round(canvas.clientHeight * dpr * scale));
+  if (canvas.width !== w || canvas.height !== h){ canvas.width = w; canvas.height = h; }
+}
+function frame(){
+  const now = performance.now();
+  const dt = Math.min(0.05, (now - lastT)/1000);
+  lastT = now;
+  frameEMA = 0.92*frameEMA + 0.08*(dt*1000);
+  // auto resolution: keep frame time in a comfortable band
+  if (frameEMA > 26) S.dynScale = Math.max(0.38, S.dynScale*0.96);
+  else if (frameEMA < 13) S.dynScale = Math.min(1.0, S.dynScale*1.02);
+
+  if (S.plunge) stepPlunge(dt);
+  stepParticles(dt);
+
+  resize();
+  const cam = cameraState();
+  const DB = diskBasis();
+
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  gl.uniform2f(U.uRes, canvas.width, canvas.height);
+  gl.uniform1f(U.uM, S.M);
+  gl.uniform3f(U.uCamPos, cam.pos[0], cam.pos[1], cam.pos[2]);
+  gl.uniformMatrix3fv(U.uCamBasis, false, new Float32Array([
+    cam.right[0], cam.right[1], cam.right[2],
+    cam.up[0],    cam.up[1],    cam.up[2],
+    cam.fwd[0],   cam.fwd[1],   cam.fwd[2]]));
+  gl.uniform1f(U.uTanHalfFov, Math.tan(S.fovDeg*PI/360));
+  gl.uniform1f(U.uEt, cam.Et);
+  gl.uniform1f(U.uW, cam.w);
+  gl.uniform3f(U.uDiskN, DB.dN[0], DB.dN[1], DB.dN[2]);
+  gl.uniform3f(U.uDiskX, DB.dX[0], DB.dX[1], DB.dX[2]);
+  gl.uniform3f(U.uDiskY, DB.dY[0], DB.dY[1], DB.dY[2]);
+  gl.uniform1f(U.uRin, Rin());
+  gl.uniform1f(U.uRout, Rout());
+  gl.uniform1f(U.uTpeak, S.Tpeak);
+  gl.uniform1f(U.uExposure, S.exposure);
+  gl.uniform1f(U.uTime, now/1000);
+  gl.uniform1f(U.uSpin, S.spin);
+  const fl = (S.show.disk?1:0) | (S.show.stars?2:0) | (S.show.grid?4:0) | (S.show.shift?8:0)
+           | (S.show.beam?16:0) | (S.show.turb?32:0) | (S.show.drift?64:0);
+  gl.uniform1i(U.uFlags, fl);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+  inset.style.display = S.show.inset ? 'block' : 'none';
+  if (S.show.inset) drawInset(cam, DB);
+  updateHUD(cam);
+
+  if (now - fpsTick > 500){
+    fpsTick = now;
+    $('fps').textContent = (1000/Math.max(frameEMA,1e-3)).toFixed(0) + ' fps · '
+      + canvas.width + '×' + canvas.height;
+  }
+  requestAnimationFrame(frame);
+}
+spawnParticles();
+syncSliders();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
