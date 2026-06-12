@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Schwarzschild — first-principles GR ray tracer</title>
+<title>Schwarzschild — classical &amp; quantum-inspired GR ray tracer</title>
 <style>
 :root{
   --bg:#06080d; --panel:#0d1219; --line:#1d2733; --ink:#c9d4e3; --dim:#8fa3bd;
@@ -87,6 +87,19 @@ body.plunging .plungeLock{opacity:.35;pointer-events:none}
 @media (prefers-reduced-motion:reduce){
   *{transition:none !important}
 }
+.seg{display:flex;gap:4px;margin:6px 0}
+.seg button{flex:1;margin:0;padding:6px 2px;font-size:11px}
+.seg button.active{border-color:var(--blue);color:var(--blue);background:rgba(111,179,255,.08)}
+.modeNote{color:var(--dim);font-size:10.5px;margin:6px 0 2px;line-height:1.55}
+body.mC .qonly{opacity:.35}
+body:not(.mF) .fuzzOnly{display:none}
+#aboutBox{position:fixed;inset:0;z-index:8;display:none;align-items:center;justify-content:center;background:rgba(3,5,9,.72)}
+#aboutBox.show{display:flex}
+#aboutBox .inner{max-width:640px;width:92vw;max-height:80vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px 20px}
+#aboutBox h3{margin:0 0 8px;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--amber)}
+#aboutBox p{font-size:12px;color:var(--ink);margin:8px 0;line-height:1.6}
+#aboutBox .tag{color:var(--blue)}
+#aboutBox button{width:auto;margin-top:8px}
 </style>
 </head>
 <body>
@@ -95,7 +108,7 @@ body.plunging .plungeLock{opacity:.35;pointer-events:none}
 
 <div id="topleft">
   <h1>Schwarzschild</h1>
-  <p class="sub">first-principles null-geodesic ray tracer · WebGL2 · zero dependencies</p>
+  <p class="sub">first-principles geodesics · classical &amp; quantum-inspired metrics · WebGL2 · zero dependencies</p>
   <pre id="hud"></pre>
 </div>
 
@@ -104,11 +117,24 @@ body.plunging .plungeLock{opacity:.35;pointer-events:none}
 
 <button id="panelToggle" title="show / hide controls">controls</button>
 <aside id="panel">
+  <h2>Quantum gravity</h2>
+  <div class="seg">
+    <button id="modeC" class="active">Classical</button>
+    <button id="modeL">LQG bounce</button>
+    <button id="modeF">Fuzzball</button>
+  </div>
+  <label class="row qonly"><span class="k">quantum scale</span>
+    <input type="range" id="qscale" min="0" max="1" step="0.01" value="0.45"><span class="v" id="qscaleV"></span></label>
+  <label class="row fuzzOnly"><span class="k">fuzz emission</span>
+    <input type="range" id="femit" min="0" max="4" step="0.05" value="1.6"><span class="v" id="femitV"></span></label>
+  <p class="modeNote" id="modeNote"></p>
+  <button id="aboutBtn">Physics notes — what is real here?</button>
+
   <h2>Spacetime</h2>
   <label class="row plungeLock"><span class="k">mass M</span>
     <input type="range" id="mass" min="0.5" max="2.5" step="0.01" value="1"><span class="v" id="massV"></span></label>
   <label class="row plungeLock"><span class="k">observer r</span>
-    <input type="range" id="dist" min="6" max="140" step="0.5" value="27"><span class="v" id="distV"></span></label>
+    <input type="range" id="dist" min="1.5" max="140" step="0.5" value="27"><span class="v" id="distV"></span></label>
 
   <h2>Accretion disk</h2>
   <label class="row"><span class="k">inclination</span>
@@ -154,9 +180,19 @@ body.plunging .plungeLock{opacity:.35;pointer-events:none}
   <p class="hint">drag — look around · wheel / pinch — zoom<br>
   during a plunge the camera rides a radial timelike geodesic;<br>
   mass and distance lock until you return to orbit.<br><br>
-  exact Schwarzschild geometry · RK4 with error control<br>
-  shadow edge = b_c = 3&#8730;3&#8201;M ≈ 5.196&#8201;M</p>
+  exact geodesics for the selected metric · RK4 with error control<br>
+  b_c, horizons, ISCO recomputed live (see HUD)<br>
+  sweep the quantum scale across l* ≈ 0.77&#8201;M and watch the shadow fill in</p>
 </aside>
+
+<div id="aboutBox"><div class="inner">
+  <h3>Physics notes — what is real here?</h3>
+  <p><span class="tag">[EXACT]</span> Everything downstream of a chosen metric f(r): the geodesic equations r&#776; = −f′/2·[timelike] + L²(2f−rf′)/(2r³), the signed-velocity camera tetrad (identity verified to 9×10⁻¹⁶ including trapped regions), shifts g = √(f−rf′/2)/(E−ΩL_z), tides (−f″/2, −f′/2r), and the Kretschmann scalar K = f″² + 4(f′/r)² + 4((1−f)/r²)². The classical mode is exact Schwarzschild.</p>
+  <p><span class="tag">[MODEL]</span> The quantum modes replace f with the Hayward regular metric f = 1 − 2Mr²/(r³+2Ml²): an LQG-<em>inspired</em> phenomenological metric (holonomy-style curvature cap, de Sitter core, K ≤ 24/l⁴) — <em>not</em> a solution of loop quantum gravity. The bounce is emergent (infall reverses where f = Ẽ²), but reading the second asymptotic region as our future (black→white-hole transition) is a conjecture. Real fuzzballs are horizonless microstate geometries of 10-D string theory; here a horizonless capped metric stands in for geodesics, and the string drag on the camera is explicitly ad hoc.</p>
+  <p><span class="tag">[DECOR]</span> The string-filament glow (procedural noise — though each sample carries the exact static-emitter redshift √f/E), disk turbulence, star positions and colors, and the universe-B sky tint.</p>
+  <p>Nothing here is a solution of full quantum gravity — none exists to solve. The quantum-scale slider applies exact mathematics to a speculative metric, and the labels say which is which.</p>
+  <button id="aboutClose">close</button>
+</div></div>
 
 <div id="valbox">
   <div class="vhead"><span>validation suite — error-controlled RK4 (CPU), same equations as the GPU marcher</span>
@@ -165,15 +201,14 @@ body.plunging .plungeLock{opacity:.35;pointer-events:none}
 </div>
 
 <div id="horizonFlash"><div>
-  <strong>You have crossed the event horizon</strong>
-  <span>r &lt; 2M — locally nothing marks the crossing, but every future-directed path now ends at r = 0.<br>
-  The view stays computable: the equations integrated here are regular at r = 2M.</span>
+  <strong id="bannerT">You have crossed the event horizon</strong>
+  <span id="bannerS">r &lt; 2M — locally nothing marks the crossing, but every future-directed path now ends at r = 0.</span>
 </div></div>
 
 <script>
 'use strict';
 /* =====================================================================================
-   SCHWARZSCHILD BLACK HOLE — a first-principles general-relativistic ray tracer
+   SCHWARZSCHILD + QUANTUM-INSPIRED INTERIORS — first-principles GR ray tracer
    =====================================================================================
 
    Everything below is derived from the Schwarzschild line element (G = c = 1):
@@ -284,6 +319,70 @@ body.plunging .plungeLock{opacity:.35;pointer-events:none}
 
    STEP 4 — rendering + UI;  STEP 5 — performance (dynamic resolution, early
    termination, single-pass WebGL2, zero dependencies). Details inline below.
+
+   =====================================================================================
+   QUANTUM-GRAVITY MODES — honesty taxonomy
+   =====================================================================================
+   Three rigor classes label everything below:
+     [EXACT]  exact for the *stated* metric (derivations + numerics, validated);
+     [MODEL]  speculative effective model standing in for unknown quantum gravity;
+     [DECOR]  pure visualization, no physical content claimed.
+
+   PART B — GENERALIZED STATIC METRIC MODULE  [EXACT given f]
+   Every classical derivation above survives the replacement f = 1−2M/r → f(r)
+   for any static metric ds² = −f dt² + dr²/f + r²dΩ²:
+       photon:    r̈ = L² (2f − r f′)/(2r³),          φ̇ = L/r²
+       timelike:  r̈ = −f′/2 + L² (2f − r f′)/(2r³)
+       tetrad (SIGNED radial velocity p_r):  Ẽ = √(p_r² + f),
+           E = Ẽ − p_r·n_r,   q₀ = dr/dσ = −p_r + Ẽ·n_r
+           identity q₀² + f ℓ²/r² = E² holds for EITHER sign of p_r
+           (validated to 9e−16, incl. trapped regions) — one formula renders
+           the infall, the bounce, and the white-hole exit.
+       disk:      Ω² = f′/(2r),   g = √(f − r f′/2)/(E − Ω L_z)
+       tides (radial free fall, per unit length): radial −f″/2, transverse −f′/(2r)
+       Kretschmann for this metric class (checked against 48M²/r⁶ and 24/l⁴):
+           K = f″² + 4(f′/r)² + 4((1−f)/r²)²
+
+   PART C — LQG BOUNCE MODE  [MODEL]
+   f(r) = 1 − 2Mr²/(r³ + 2Ml²)   (Hayward regular metric), closed forms
+       f′ = −2Mr(4Ml² − r³)/D²,  f″ = −4M(r⁶ − 14Ml²r³ + 4M²l⁴)/D³,  D = r³ + 2Ml².
+   An LQG-*inspired* phenomenological metric — holonomy-style curvature cap with
+   a de Sitter core (K ≤ 24/l⁴, f″(0) = −2/l²). It is NOT a solution of loop
+   quantum gravity; real LQG interior dynamics (e.g. Ashtekar–Olmedo–Singh)
+   differ. EMERGENT here (not scripted):
+     • repulsion: −f′/2 > 0 for r³ < 4Ml² — the core pushes back;
+     • the bounce: radial infall from rest has Ẽ < 1 and f(0) = 1, so the
+       trajectory reverses where f(r_b) = Ẽ² (validated to 8e−7 vs root-finding);
+     • horizons exist iff l < l* = 4M/(3√3) ≈ 0.7698M (threshold reproduced to
+       2e−8). Above l*: horizonless — the shadow physically fills in because no
+       photon-capture set remains;
+     • tidal healing: −f″/2 → +1/l² (finite, isotropic de Sitter) instead of
+       the classical divergence 2M/r³;
+     • sightlines threading the core (r < r₋) connect, in the eternal extension,
+       to a SECOND asymptotic region (Reissner–Nordström-like ladder); core
+       passages are counted per ray and that region drawn as a tinted second
+       starfield. Reading the post-bounce exterior as our future (black-to-
+       white-hole transition à la Rovelli–Haggard) is a CONJECTURE; the banners
+       and "universe parity" implement exactly this reading and say so.
+
+   PART D — FUZZBALL MODE  [MODEL] + [DECOR]
+   Real fuzzballs are horizonless microstate geometries of 10-D string theory;
+   no single 4-D metric represents the generic state. Stand-ins:
+     • geodesics in a horizonless capped metric (Hayward, l > l*) reproducing
+       the defining phenomenology — Schwarzschild exterior, no horizon, no
+       interior, enormous finite surface redshift  [MODEL];
+     • the visible "string soup" is an emissive volumetric filament field
+       (procedural noise)  [DECOR] — but every sample is weighted by the EXACT
+       static-emitter shift g = √f(r)/E, so the fuzz is nearly black at small
+       quantum scale for the true physical reason: surface redshift. That is
+       precisely why fuzzballs are expected to mimic black holes;
+     • the camera feels a string drag −γ(r)·p_r and settles into the fuzz
+       ("information preserved on the surface") — an explicitly AD-HOC force
+       standing in for microstate interactions  [MODEL].
+
+   NOTHING IN THIS FILE IS A SOLUTION OF FULL QUANTUM GRAVITY — none exists to
+   solve. The quantum-scale slider applies exact mathematics to a speculative
+   metric, and the UI says so.
    ===================================================================================== */
 
 const $ = id => document.getElementById(id);
@@ -328,6 +427,35 @@ const timelikeRHS = (L, M) => s => {
   const r2 = s[0] * s[0];
   return [s[1], -M / r2 + L * L * (s[0] - 3 * M) / (r2 * r2), L / r2];
 };
+
+/* ---------------- generalized metric (mode-aware), see PART B/C above ----------------
+   [EXACT for the stated f]: closed forms validated against finite differences
+   (f′ 1.5e−10, f″ 2.6e−8) and against the 48M²/r⁶ / 24/l⁴ limits. */
+function Fm(r){                       // f(r)
+  if (S.mode === 0 || S.l < 1e-9) return 1 - 2*S.M/r;
+  const D = r*r*r + 2*S.M*S.l*S.l;
+  return 1 - 2*S.M*r*r/D;
+}
+function Fp(r){                       // f′(r)
+  if (S.mode === 0 || S.l < 1e-9) return 2*S.M/(r*r);
+  const D = r*r*r + 2*S.M*S.l*S.l;
+  return -2*S.M*r*(4*S.M*S.l*S.l - r*r*r)/(D*D);
+}
+function Fpp(r){                      // f″(r)
+  if (S.mode === 0 || S.l < 1e-9) return -4*S.M/(r*r*r);
+  const ll = S.l*S.l, D = r*r*r + 2*S.M*ll;
+  return -4*S.M*(r**6 - 14*S.M*ll*r**3 + 4*S.M*S.M*ll*ll)/(D**3);
+}
+function geoG(r){                     // (2f − r f′)/(2r³), cancellation-free
+  if (S.mode === 0 || S.l < 1e-9) return (r - 3*S.M)/(r*r*r*r);
+  const D = r*r*r + 2*S.M*S.l*S.l;
+  return 1/(r*r*r) - 3*S.M*r*r/(D*D);
+}
+const tlRHS = L => s => [s[1], -0.5*Fp(s[0]) + L*L*geoG(s[0]), L/(s[0]*s[0])];
+function KofR(r){                     // Kretschmann, this metric class [EXACT]
+  const f = Fm(r), fp = Fp(r), fpp = Fpp(r);
+  return fpp*fpp + 4*(fp/r)**2 + 4*((1 - f)/(r*r))**2;
+}
 
 /* ------------------------- In-page validation suite ------------------------- */
 function runValidation(out) {
@@ -393,6 +521,53 @@ function runValidation(out) {
     const dphi = (minima[2] - minima[0]) / 2 - 2 * PI, weak = 6 * PI * M / (a * (1 - e * e));
     lines.push(`[5] periapsis advance a=40M,e=0.2: ${dphi.toFixed(4)} rad/orbit  (weak-field ${weak.toFixed(4)}; +${((dphi / weak - 1) * 100).toFixed(1)}% = genuine O(M/p) GR term)`);
   }
+  // ---------------- quantum-mode checks (Hayward regular metric, M = 1) ----------------
+  const hay = lq => ({
+    f:   r => { const D = r*r*r + 2*lq*lq; return 1 - 2*r*r/D; },
+    fp:  r => { const D = r*r*r + 2*lq*lq; return -2*r*(4*lq*lq - r*r*r)/(D*D); },
+    fpp: r => { const D = r*r*r + 2*lq*lq; return -4*(r**6 - 14*lq*lq*r**3 + 4*lq**4)/(D*D*D); },
+  });
+  // (6) closed-form f′, f″ vs central finite differences
+  { const m = hay(0.3); let w1 = 0, w2 = 0;
+    for (const r of [0.05, 0.3, 1.5, 6]){
+      const e = 1e-6*Math.max(r, 0.1), e2 = 1e-4*Math.max(r, 0.1);
+      w1 = Math.max(w1, Math.abs(m.fp(r) - (m.f(r+e) - m.f(r-e))/(2*e))/Math.abs(m.fp(r)));
+      w2 = Math.max(w2, Math.abs(m.fpp(r) - (m.f(r+e2) - 2*m.f(r) + m.f(r-e2))/(e2*e2))/Math.abs(m.fpp(r)));
+    }
+    lines.push(`[6] Hayward closed forms vs finite differences: f′ ${w1.toExponential(1)}, f″ ${w2.toExponential(1)} (FD-limited)`); }
+  // (7) horizon-loss threshold l* vs 4M/(3√3)
+  { const has = lq => { const m = hay(lq); let mn = 1;
+      for (let i = 0; i < 1200; i++){ const r = 0.001 + i*3.5/1199; mn = Math.min(mn, m.f(r)); } return mn < 0; };
+    let l1 = 0.70, l2 = 0.85;
+    for (let i = 0; i < 40; i++){ const m = 0.5*(l1 + l2); has(m) ? l1 = m : l2 = m; }
+    const ls = 0.5*(l1 + l2), lt = 4/(3*Math.sqrt(3));
+    lines.push(`[7] horizon-loss threshold l* = ${ls.toFixed(6)} M  (4M/3√3 = ${lt.toFixed(6)};  rel.err ${(Math.abs(ls - lt)/lt).toExponential(1)})`); }
+  // (8) emergent bounce: drop from rest at r0 = 12M, l = 0.3
+  { const m = hay(0.3), r0 = 12, Et2 = m.f(r0);
+    const rhs = s => [s[1], -0.5*m.fp(s[0])];
+    let y = [r0, 0], h = 0.01, drift = 0, rb = 0;
+    for (let i = 0; i < 2e5 && rb === 0; i++){
+      const pb = y[1];
+      [y, , h] = adaptiveStep(y, Math.min(h, 0.05), rhs, 1e-11, Math.max(0.004, 0.05*y[0]));
+      drift = Math.max(drift, Math.abs(y[1]*y[1] + m.f(y[0]) - Et2));
+      if (pb < 0 && y[1] >= 0) rb = y[0];
+    }
+    let a = 1e-4, b = 1;
+    for (let i = 0; i < 70; i++){ const c = 0.5*(a + b); (m.f(c) - Et2 > 0) ? a = c : b = c; }
+    lines.push(`[8] LQG bounce (l=0.3, drop from 12M): r_b = ${rb.toFixed(5)} M  vs root of f = Ẽ²: ${(0.5*(a+b)).toFixed(5)} M;  energy drift ${drift.toExponential(1)}`); }
+  // (9) curvature cap at the regular center
+  { const m = hay(0.3), r = 1e-3;
+    const K = m.fpp(r)**2 + 4*(m.fp(r)/r)**2 + 4*((1 - m.f(r))/(r*r))**2;
+    lines.push(`[9] K(r→0, l=0.3) = ${K.toFixed(2)} M⁻⁴  vs de Sitter cap 24/l⁴ = ${(24/0.3**4).toFixed(2)}  (regular center ✓)`); }
+  // (10) signed-p_r tetrad identity (in/out-going, incl. trapped region)
+  { const m = hay(0.3); let worst = 0;
+    for (const r of [0.2, 0.6, 1.2, 3, 8]) for (const pr of [-1.2, 0, 1.2]) for (const nr of [-1, -0.5, 0.5, 1]){
+      const f = m.f(r); if (pr*pr + f <= 0) continue;
+      const Et = Math.sqrt(pr*pr + f), nt = Math.sqrt(1 - nr*nr);
+      const E = Et - pr*nr, q0 = -pr + Et*nr, lp = r*nt;
+      worst = Math.max(worst, Math.abs(q0*q0 + f*lp*lp/(r*r) - E*E));
+    }
+    lines.push(`[10] signed-p_r tetrad identity (in/out-going): max residual ${worst.toExponential(1)}`); }
   out.textContent = lines.join('\n');
 }
 
@@ -441,8 +616,12 @@ const FS = `#version 300 es
       (regular through r = 2M -- equivalent to Eddington-Finkelstein integration);
    4. disk-plane crossings occur exactly at phi = atan2(-A,B) + k*pi  (A = rhat.d, B = eb.d),
       giving direct image (k=0/1), secondary images and the photon ring (k>=2) for free;
-   5. shade with g = sqrt(1-3M/r)/(E - Omega*Lz): color from Planck locus at g*T(r),
-      surface brightness scaled by g^4 (Liouville);  sky shift g_sky = 1/E. */
+   5. shade with g = sqrt(f - r f'/2)/(E - Omega*Lz): color from Planck locus at g*T(r),
+      surface brightness scaled by g^4 (Liouville);  sky shift g_sky = 1/E.
+   QUANTUM MODES [MODEL]: same pipeline with f -> Hayward regular metric (uMode, uL).
+   Rays thread the regular core; corePass counts traversals and (when horizons exist)
+   selects which asymptotic region's starfield to draw. Fuzz mode adds an emissive
+   volumetric string field [DECOR] weighted by the exact static-emitter shift sqrt(f)/E. */
 precision highp float;
 precision highp int;
 
@@ -457,12 +636,30 @@ uniform float uRin, uRout, uTpeak;
 uniform float uExposure, uTime, uSpin;
 uniform int   uFlags;        // bit0 disk |1 stars |2 grid |3 color shift |4 beaming |5 turbulence |6 drift view
 uniform sampler2D uBB;
+uniform int   uMode;         // 0 classical | 1 LQG-inspired (Hayward) | 2 fuzzball stand-in
+uniform float uL;            // quantum length scale l, geometric units      [MODEL]
+uniform float uRm;           // inner horizon r- (0: none/horizonless)
+uniform float uParity;       // camera universe parity (post-bounce sky)     [MODEL]
+uniform float uFuzzR, uFuzzEmit, uFuzzKap;   // fuzz radius / emissivity / opacity [DECOR]
 
 out vec4 outColor;
 const float PI = 3.141592653589793;
 float Mm; float Lph;
 
 bool flagB(int b){ return (uFlags & (1 << b)) != 0; }
+
+/* metric module — mode 0 [EXACT]: Schwarzschild; modes 1,2 [MODEL]: Hayward
+   f = 1 - 2M r^2 / (r^3 + 2M l^2): de Sitter core, K <= 24/l^4. */
+float fmet(float r){
+  if (uMode == 0) return 1.0 - 2.0*Mm/r;
+  float D = r*r*r + 2.0*Mm*uL*uL;
+  return 1.0 - 2.0*Mm*r*r/D;
+}
+float fpr(float r){
+  if (uMode == 0) return 2.0*Mm/(r*r);
+  float D = r*r*r + 2.0*Mm*uL*uL;
+  return -2.0*Mm*r*(4.0*Mm*uL*uL - r*r*r)/(D*D);
+}
 
 float hash13(vec3 p){
   uvec3 q = floatBitsToUint(p + vec3(0.1318, 0.7113, 0.9341));
@@ -495,23 +692,28 @@ float diskTfrac(float r){
   return pow(clamp(p, 0.0, 1.0) / 0.05665244, 0.25);
 }
 
-/* geodesic RHS in the ray's plane: state s = (r, q, phi) */
+/* geodesic RHS in the ray's plane: state s = (r, q, phi).
+   r'' = l^2 (2f - r f')/(2r^3); closed forms avoid cancellation [EXACT for f]:
+   mode 0: (r - 3M)/r^4;  Hayward: 1/r^3 - 3M r^2/D^2,  D = r^3 + 2M l^2. */
 vec3 geoRHS(vec3 s){
-  float r2 = s.x*s.x;
-  return vec3(s.y, Lph*Lph*(s.x - 3.0*Mm)/(r2*r2), Lph/r2);
+  float r = s.x, r2 = r*r;
+  float G;
+  if (uMode == 0) G = (r - 3.0*Mm)/(r2*r2);
+  else { float D = r*r2 + 2.0*Mm*uL*uL; G = 1.0/(r*r2) - 3.0*Mm*r2/(D*D); }
+  return vec3(s.y, Lph*Lph*G, Lph/r2);
 }
 
-vec3 starfield(vec3 d, float Tshift){
+vec3 starfield(vec3 d, float Tshift, float off){
   vec3 acc = vec3(0.0);
   for (int sh = 0; sh < 2; sh++){
     float sc = (sh == 0) ? 21.0 : 43.0;
     vec3 cell = floor(d * sc);
-    vec3 rnd = hash33(cell);
+    vec3 rnd = hash33(cell + off);
     if (rnd.x < ((sh == 0) ? 0.22 : 0.30)){
       vec3 sdir = normalize(cell + 0.5 + (rnd - 0.5)*0.85);
       float ca = clamp(dot(d, sdir), -1.0, 1.0);
       float ang = sqrt(max(2.0*(1.0 - ca), 0.0));
-      float big = pow(hash13(cell + 7.7), 14.0);
+      float big = pow(hash13(cell + 7.7 + off), 14.0);
       float sz = (1.5 + 12.0*big) * 0.0011;
       float amp = (0.4 + 5.0*pow(rnd.y, 6.0)) * ((sh == 0) ? 1.0 : 0.55);
       float Tstar = 2600.0 + 14000.0*rnd.z*rnd.z;
@@ -520,7 +722,7 @@ vec3 starfield(vec3 d, float Tshift){
   }
   vec3 gn = normalize(vec3(0.32, 0.91, 0.26));      // procedural galactic band
   float band = exp(-pow(dot(d, gn)/0.135, 2.0));
-  float n = fbm(d*5.5);
+  float n = fbm(d*5.5 + off);
   acc += (vec3(0.20, 0.235, 0.33) + vec3(0.16, 0.10, 0.05)*n) * band * (0.10 + 0.32*n);
   return acc;
 }
@@ -557,7 +759,7 @@ void main(){
   Lph      = r * nt;                        // photon angular momentum (omega_cam = 1)
   float E  = uEt + uW * nr;                 // conserved Killing energy (incoming photon)
   float q0 = uW + uEt * nr;                 // dr/dsigma at the camera
-  float f0 = 1.0 - 2.0*Mm/r;
+  float f0 = fmet(r);
   float E2 = q0*q0 + f0*Lph*Lph/(r*r);      // = E^2; monitored as integration invariant
 
   float A = dot(rh, uDiskN), B = dot(eb, uDiskN);
@@ -573,13 +775,17 @@ void main(){
   vec3 col = vec3(0.0);
   bool done = false;
   float drift = 0.0;
+  float trans = 1.0;       // volumetric transmittance (fuzz mode)
+  int corePass = 0;        // # times this ray entered the quantum core (r < r-)
 
-  for (int i = 0; i < 460; i++){
+  for (int i = 0; i < 560; i++){
     /* heuristic step bounds (the controlled adaptive RK4 lives on the CPU side;
        drift view visualizes how well these bounds do): */
     float h = 0.18 * s.x / max(abs(s.y), 0.05);
     if (Lph > 1e-6) h = min(h, 0.065 * s.x*s.x / Lph);   // |dphi| <= 0.065 < pi (no crossing skipped)
     h = min(h, 0.30*Resc);
+    if (uMode != 0 && s.x < 6.0*uL) h = min(h, 0.45*uL + 0.015*Mm);   // resolve the core
+    if (uMode == 2 && s.x < 1.1*uFuzzR) h = min(h, 0.08*Mm);          // sample the fuzz
 
     vec3 sp = s;
     vec3 k1 = geoRHS(s);
@@ -588,20 +794,52 @@ void main(){
     vec3 k4 = geoRHS(s + h*k3);
     s += (h/6.0)*(k1 + 2.0*k2 + 2.0*k3 + k4);
 
-    if (s.x < 0.02*Mm){ done = true; break; }
+    if (uMode == 0){
+      if (s.x < 0.02*Mm){ done = true; break; }    // classical central singularity
+    } else if (s.x < 0.015*Mm){
+      /* regular core: an (almost) exactly radial ray passes through r = 0 to the
+         antipode — reflect the 1D radial coordinate (measure-zero pixels) [EXACT]. */
+      s.x = 0.03*Mm - s.x; s.y = -s.y; s.z += PI;
+      if (diskOn && s.z >= phiX) phiX += PI*(floor((s.z - phiX)/PI) + 1.0);
+    }
+    if (uRm > 0.0 && sp.x >= uRm && s.x < uRm) corePass++;   // entered the core region
 
     if (flagB(6)){
-      float c = s.y*s.y + (1.0 - 2.0*Mm/s.x)*Lph*Lph/(s.x*s.x);
+      float c = s.y*s.y + fmet(s.x)*Lph*Lph/(s.x*s.x);
       drift = max(drift, abs(c - E2)/max(E2, 1e-9));
+    }
+
+    /* [DECOR geometry, EXACT redshift weighting] fuzzball string field: emissive
+       filaments inside r < uFuzzR. Each sample is a STATIC emitter at radius r,
+       so its shift is g = sqrt(f(r))/E — the enormous surface redshift of a
+       near-cap metric is exactly why a fuzzball looks black until the quantum
+       scale lifts the cap. Extinction terminates deep rays: "absorbed". */
+    if (uMode == 2 && s.x < uFuzzR){
+      vec3 pos = s.x*(cos(s.z)*rh + sin(s.z)*eb);
+      float aT = uTime*0.13, ca2 = cos(aT), sa2 = sin(aT);
+      vec3 q3 = pos*(2.3/Mm);
+      q3 = vec3(ca2*q3.x - sa2*q3.z, q3.y, sa2*q3.x + ca2*q3.z);
+      float n1 = fbm(q3 + vec3(0.0, uTime*0.06, 0.0));
+      float fil = pow(1.0 - abs(2.0*n1 - 1.0), 6.0);
+      float env = (1.0 - smoothstep(0.82*uFuzzR, uFuzzR, s.x))*(0.30 + 0.70*smoothstep(0.0, 0.55*Mm, s.x));
+      float dens = (0.15 + 2.1*fil)*env;
+      float fl = max(fmet(s.x), 1e-4);
+      float gv = sqrt(fl)/max(E, 1e-3), gv2 = gv*gv;
+      vec3 hue = mix(vec3(0.42,0.16,1.0), vec3(0.12,0.85,1.0), vnoise(q3*1.6 + 3.3));
+      hue = mix(hue, vec3(1.0,0.72,0.28), pow(vnoise(q3*0.8 + 9.1), 3.0));
+      col += trans * hue * (uFuzzEmit * dens * gv2*gv2) * h;
+      trans *= exp(-uFuzzKap * dens * h);
+      if (trans < 0.02){ done = true; break; }
     }
 
     if (diskOn && s.z >= phiX){
       float t = (phiX - sp.z) / max(s.z - sp.z, 1e-9);
       float rHit = mix(sp.x, s.x, t);
       if (rHit >= uRin && rHit <= uRout){
-        float Om = uSpin * sqrt(Mm/(rHit*rHit*rHit));   // exact Schwarzschild Kepler rate
+        float fpH = fpr(rHit);
+        float Om = uSpin * sqrt(max(fpH/(2.0*rHit), 0.0));   // Omega^2 = f'/(2r) [EXACT for f]
         float Lz = -Lph * dot(mh, uDiskN);              // photon L about the DISK axis
-        float g  = sqrt(max(1.0 - 3.0*Mm/rHit, 1e-6)) / max(E - Om*Lz, 1e-4);
+        float g  = sqrt(max(fmet(rHit) - 0.5*rHit*fpH, 1e-6)) / max(E - Om*Lz, 1e-4);
         float gC = flagB(3) ? g : 1.0;
         float gB = flagB(4) ? g : 1.0;
         float Tem = uTpeak * diskTfrac(rHit);
@@ -610,37 +848,44 @@ void main(){
         if (flagB(5)){                                   // artistic turbulence (see notes)
           vec3 P = cos(phiX)*rh + sin(phiX)*eb;
           float az = atan(dot(P, uDiskY), dot(P, uDiskX));
-          float wind = az - uSpin*sqrt(Mm/(rHit*rHit*rHit))*uTime*0.55;
+          float wind = az - uSpin*sqrt(max(fpH/(2.0*rHit), 0.0))*uTime*0.55;
           float tx = fbm(vec3(cos(wind), sin(wind), 0.0)*3.0 + vec3(0.0, 0.0, 6.0*log(rHit/Mm)));
           I *= 0.55 + 0.9*tx;
         }
-        col = bbColor(clamp(gC*Tem, 1000.0, 39500.0)) * (3.2 * I);
+        col += trans * bbColor(clamp(gC*Tem, 1000.0, 39500.0)) * (3.2 * I);
         done = true; break;
       }
       phiX += PI;
     }
 
-    /* backward ray fell through r = 2M: in a real (collapse-formed) spacetime no light
-       emerges along this sightline -> the shadow. (Camera inside the horizon never
-       triggers this: there q stays > 0 — the past of an interior event lies OUTWARD.) */
-    if (s.x < 1.999*Mm && s.y < 0.0){ done = true; break; }
+    /* CLASSICAL ONLY: backward ray fell through r = 2M -> the shadow (no light
+       emerges along this sightline in a collapse-formed spacetime). In the quantum
+       modes the metric is regular: rays thread the core and exit — for l < l* they
+       emerge into the OTHER asymptotic region (counted by corePass) [MODEL]. */
+    if (uMode == 0 && s.x < 1.999*Mm && s.y < 0.0){ done = true; break; }
 
     if (s.x > Resc && s.y > 0.0){
       vec3 er =  cos(s.z)*rh + sin(s.z)*eb;
       vec3 ep = -sin(s.z)*rh + cos(s.z)*eb;
       vec3 dir = normalize(s.y*er + (Lph/s.x)*ep);   // celestial direction of the source
+      /* E <= 0 escapes exist only through past-horizon structure not modeled
+         here (negative-Killing-energy sightlines deep inside f < 0): kept dark. */
       if (E > 2e-3){
         float gs = min(1.0/E, 6.0);                  // sky shift, clamped (g->inf is measure zero)
         float Tsh = flagB(3) ? gs : 1.0;
+        int par = (int(uParity + 0.5) + corePass) & 1;   // which asymptotic region [MODEL]
+        float off = float(par)*61.0;                      // independent star seed
         vec3 sky = vec3(0.0);
-        if (flagB(1)) sky += starfield(dir, Tsh);
+        if (flagB(1)) sky += starfield(dir, Tsh, off);
         if (flagB(2)) sky += vec3(0.30, 0.50, 0.65) * skyGrid(dir) * 0.5;
-        col = sky * (flagB(4) ? gs*gs*gs*gs : 1.0);
+        if (par == 1) sky *= vec3(0.72, 0.86, 1.32);      // universe-B tint [MODEL]
+        col += trans * sky * (flagB(4) ? gs*gs*gs*gs : 1.0);
       }
       done = true; break;
     }
 
-    if (s.z > 6.2831853*3.1){ done = true; break; }  // >=3 windings: sub-pixel ring tail
+    float wcap = (uMode == 0) ? 19.5 : 27.0;         // 3.1 / 4.3 windings
+    if (s.z > wcap){ done = true; break; }           // beyond: sub-pixel ring tail
   }
 
   if (flagB(6)){
@@ -672,13 +917,100 @@ const S = {
   resScale: 0.7, routFac: 3.4, spin: 1,
   yaw: -0.55, pitch: 0.10,
   show: { disk:true, stars:true, grid:false, shift:true, beam:true, turb:true, drift:false, inset:true },
-  plunge: null,          // {r, pr, tau, dir, lookYaw, lookPitch}
+  plunge: null,          // {r, pr, tau, dir, lookYaw, lookPitch, ...event flags}
   plungeRate: 1.0,
   tidalMass: 10,         // solar masses, HUD readout only
   interacting: 0, dynScale: 1.0,
+  /* ---- quantum-mode state ---- */
+  mode: 0,               // 0 classical | 1 LQG bounce | 2 fuzzball
+  qs: 0.45,              // quantum-scale slider [0,1]
+  l: 0,                  // quantum length (geometric units), set by recompute()
+  parity: 0,             // camera universe parity (flips on core traversal) [MODEL]
+  femit: 1.6,            // fuzz emissivity [DECOR]
+  // derived by recompute(): horizons, photon sphere, ISCO, f-minimum, fuzz radius
+  rp: 2, rm: 0, rph: 3, bc: 5.196, risco: 6, rin: 6, fmin: 0, rfmin: 1, fuzzR: 0,
 };
-const Rin  = () => 6*S.M;
-const Rout = () => 6*S.M*S.routFac;
+const Rin  = () => S.rin;
+const Rout = () => S.rin*S.routFac;
+
+/* ------- mode-derived geometry: recomputed on any M / mode / quantum-scale change -------
+   All by root-finding/scanning on the EXACT f of the current mode [EXACT given f]. */
+const LCRIT = 0.7698003589195010;     // 4/(3√3): horizon-existence threshold (validated 2e-8)
+function recompute(){
+  const M = S.M;
+  S.l = (S.mode === 1) ? Math.max(S.qs, 0.02)*M           // floor: numerics, labeled in UI
+      : (S.mode === 2) ? LCRIT*M*(1.035 + 0.55*S.qs)      // always horizonless [MODEL]
+      : 0;
+  S.fuzzR = (S.mode === 2) ? 2.7*M*(1 + 0.12*S.qs) : 0;
+  // horizons: roots of f on (0.002M, 4M]
+  S.rp = 0; S.rm = 0;
+  if (S.mode === 0 || S.l < 1e-9){ S.rp = 2*M; }
+  else {
+    const N = 900, roots = [];
+    let prevR = 0.002*M, prev = Fm(prevR);
+    for (let i = 1; i <= N; i++){
+      const r = 0.002*M + (4*M - 0.002*M)*i/N, v = Fm(r);
+      if (prev*v < 0){
+        let a = prevR, b = r;
+        for (let k = 0; k < 60; k++){ const c = 0.5*(a + b); (Fm(a)*Fm(c) <= 0) ? b = c : a = c; }
+        roots.push(0.5*(a + b));
+      }
+      prev = v; prevR = r;
+    }
+    if (roots.length >= 2){ S.rm = roots[0]; S.rp = roots[roots.length - 1]; }
+  }
+  // minimum of f on (0.05M, 4M] (fuzz surface redshift; bounce-domain bound)
+  { let fm = 1e9, rfm = M;
+    for (let i = 0; i <= 700; i++){
+      const r = 0.05*M + (4*M - 0.05*M)*i/700, v = Fm(r);
+      if (v < fm){ fm = v; rfm = r; }
+    }
+    S.fmin = fm; S.rfmin = rfm; }
+  // outermost photon sphere: largest root of 2f − r f′ = 0 with f > 0  ⇒  b_c = r/√f
+  S.rph = 0; S.bc = 0;
+  { const P = r => 2*Fm(r) - r*Fp(r);
+    let prevR = 0.1*M, prev = P(prevR), best = 0;
+    for (let i = 1; i <= 900; i++){
+      const r = 0.1*M + (8*M - 0.1*M)*i/900, v = P(r);
+      if (prev*v < 0){
+        let a = prevR, b = r;
+        for (let k = 0; k < 60; k++){ const c = 0.5*(a + b); (P(a)*P(c) <= 0) ? b = c : a = c; }
+        const rr = 0.5*(a + b);
+        if (Fm(rr) > 0) best = rr;
+      }
+      prev = v; prevR = r;
+    }
+    if (best > 0){ S.rph = best; S.bc = best/Math.sqrt(Fm(best)); } }
+  // ISCO: minimum of L²(r) = r³f′/(2f − rf′) where circular orbits exist
+  { let bestR = 0, bestL = 1e18;
+    for (let i = 0; i <= 4000; i++){
+      const r = 1.92*M + (14*M - 1.92*M)*i/4000;
+      const den = 2*Fm(r) - r*Fp(r);
+      if (den <= 1e-9 || Fp(r) <= 0) continue;
+      const L2 = r*r*r*Fp(r)/den;
+      if (L2 < bestL){ bestL = L2; bestR = r; }
+    }
+    S.risco = bestR > 0 ? bestR : 6*M; }
+  S.rin = Math.max(S.risco, S.rp > 0 ? 1.02*S.rp : 0, S.fuzzR > 0 ? 1.02*S.fuzzR : 0);
+  clampDist();
+}
+function minD(){
+  if (S.mode === 0) return 2.3*S.M;
+  if (S.rp > 0)     return 1.06*S.rp + 0.05*S.M;  // no hovering inside the trapped region
+  return 0.5*S.M;                                  // horizonless: the core is visitable
+}
+function clampDist(){ S.dist = Math.min(140, Math.max(minD(), S.dist)); }
+
+/* event banner (replaces the fixed horizon flash) */
+let bannerTO = 0;
+function showBanner(title, sub, ms){
+  $('bannerT').textContent = title;
+  $('bannerS').textContent = sub;
+  const el = $('horizonFlash');
+  el.classList.add('show');
+  clearTimeout(bannerTO);
+  bannerTO = setTimeout(() => el.classList.remove('show'), ms || 4600);
+}
 
 /* ----------------------------------- WebGL ----------------------------------- */
 const canvas = $('gl');
@@ -711,7 +1043,8 @@ gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 
 const U = {};
 for (const name of ['uRes','uM','uCamPos','uCamBasis','uTanHalfFov','uEt','uW','uDiskN','uDiskX','uDiskY',
-                    'uRin','uRout','uTpeak','uExposure','uTime','uSpin','uFlags','uBB'])
+                    'uRin','uRout','uTpeak','uExposure','uTime','uSpin','uFlags','uBB',
+                    'uMode','uL','uRm','uParity','uFuzzR','uFuzzEmit','uFuzzKap'])
   U[name] = gl.getUniformLocation(prog, name);
 
 const bbTex = gl.createTexture();
@@ -744,10 +1077,12 @@ function cameraState(){
     const r1 = V.rot(r0, u0, P.lookYaw);
     const f2 = V.rot(f1, r1, P.lookPitch);
     const u2 = V.cross(r1, f2);
-    // exact frame relation each frame: w from the integrated momentum, Ẽ from the
-    // first integral (keeps the tetrad identity Ẽ² − f = w² machine-exact)
-    const w  = Math.max(-P.pr, 0);
-    const Et = Math.sqrt(Math.max(P.pr*P.pr + fmet(P.r, S.M), 1e-12));
+    // exact frame relation each frame: w = −p_r kept SIGNED — the tetrad
+    // E = Ẽ + w·n_r, q₀ = w + Ẽ·n_r is valid for in- AND out-going observers
+    // (validated to 9e−16, incl. trapped regions): one formula renders the
+    // infall, the bounce, and the white-hole exit. Ẽ from the first integral.
+    const w  = -P.pr;
+    const Et = Math.sqrt(Math.max(P.pr*P.pr + Fm(P.r), 1e-12));
     return { pos, right:r1, up:u2, fwd:f2, Et, w, r:P.r };
   }
   const cp = Math.cos(S.pitch), sp = Math.sin(S.pitch);
@@ -756,61 +1091,119 @@ function cameraState(){
   let up0 = Math.abs(fwd[1]) < 0.93 ? [0,1,0] : [1,0,0];
   const right = V.norm(V.cross(fwd, up0));
   const up = V.cross(right, fwd);
-  const Et = Math.sqrt(Math.max(fmet(S.dist, S.M), 1e-9));   // static (hovering) observer
+  const Et = Math.sqrt(Math.max(Fm(S.dist), 1e-9));   // static (hovering) observer, any mode
   return { pos, right, up, fwd, Et, w:0, r:S.dist };
 }
 
-/* ------------------------- plunge: radial timelike geodesic ------------------------- */
-/* From rest at r₀ (so Ẽ = √f(r₀)); integrating the second-order form dr/dτ = p_r,
-   dp_r/dτ = −M/r² (exact for L = 0) avoids the √(Ẽ²−f) degeneracy at the release point. */
+/* ---------------- plunge: radial timelike geodesic, any metric mode ----------------
+   From rest at r0 (Ẽ = √f(r0)); integrate dr/dτ = p_r, dp_r/dτ = −f′(r)/2 [EXACT for f].
+   mode 0: −f′/2 = −M/r² — attraction all the way to the singularity.
+   mode 1: Hayward — f′ < 0 in the core (r³ < 4Ml²) ⇒ −f′/2 > 0: QUANTUM REPULSION.
+           Infall halts where f(r_b) = Ẽ² and reverses — an EMERGENT bounce
+           (validated to 8e−7 against direct root-finding), not a script.
+   mode 2: same regular metric (horizonless) + ad-hoc string drag −γ(r)·p_r [MODEL]:
+           the camera sheds radial energy and settles inside the fuzz.
+   All banners fire off DETECTED events of the integrated trajectory. */
+function bounceRadius(Et){
+  // smallest-r root of f(r) = Ẽ² (exists for Ẽ < 1 since f(0) = 1) — bisect
+  if (S.mode === 0 || Et*Et >= 1) return 0;
+  let a = 1e-5*S.M, b = Math.max(S.rfmin, 1e-4*S.M);
+  if (Fm(a) - Et*Et <= 0) return 0;
+  for (let i = 0; i < 70; i++){ const c = 0.5*(a + b); (Fm(c) - Et*Et > 0) ? a = c : b = c; }
+  return 0.5*(a + b);
+}
+function fuzzDrag(r){                       // [MODEL] explicitly ad hoc
+  if (S.mode !== 2 || S.fuzzR <= 0) return 0;
+  const x = r/(0.85*S.fuzzR);
+  return 2.4*S.qs*Math.exp(-x*x*x*x);
+}
 function startPlunge(){
   if (S.plunge) return;
-  if (S.dist < 2.3*S.M) { S.dist = Math.max(S.dist, 2.3*S.M); }
-  const cam = cameraState();
-  S.plunge = { r: S.dist, pr: 0, tau: 0, dir: V.norm(cam.pos), lookYaw: 0, lookPitch: 0,
-               Et0: Math.sqrt(fmet(S.dist, S.M)), r0: S.dist, crossed: false, landed: false };
+  clampDist();
+  S.plunge = { r: S.dist, pr: 0, tau: 0, dir: V.norm(cameraState().pos), lookYaw: 0, lookPitch: 0,
+               Et0: Math.sqrt(Math.max(Fm(S.dist), 1e-12)), r0: S.dist,
+               crossed: false, landed: false, bounced: false, whiteHole: false,
+               touchedFuzz: false, settled: false, inCore: false, rb: 0 };
   document.body.classList.add('plunging');
   $('plungeBtn').textContent = 'Abort plunge — return to orbit';
 }
 function endPlunge(){
   if (!S.plunge) return;
   const P = S.plunge;
-  S.dist = Math.min(Math.max(P.r, 2.3*S.M), 140);
+  S.dist = Math.min(Math.max(P.r, minD()), 140);
   S.pitch = Math.asin(Math.max(-1, Math.min(1, P.dir[1])));
   S.yaw = Math.atan2(P.dir[0], P.dir[2]);
   S.plunge = null;
   document.body.classList.remove('plunging');
-  $('plungeBtn').textContent = 'Plunge through the horizon';
+  $('plungeBtn').textContent = plungeLabel();
   syncSliders();
 }
 function stepPlunge(dt){
   const P = S.plunge; if (!P || P.landed) return;
-  const rhs = s => [s[1], -S.M/(s[0]*s[0])];
-  let remain = S.plungeRate * dt * 8.0;       // proper time, geometric units (×8 for watchability)
+  const rhs = s => [s[1], -0.5*Fp(s[0]) - fuzzDrag(s[0])*s[1]];
+  let remain = S.plungeRate * dt * 8.0;     // proper time, geometric units (×8 for watchability)
   let y = [P.r, P.pr], h = Math.min(0.05, remain);
   while (remain > 1e-9){
     let used, hn;
-    [y, used, hn] = adaptiveStep(y, Math.min(h, remain), rhs, 1e-10, Math.max(0.02, 0.1*y[0]));
+    const pb = y[1], rb0 = y[0];
+    [y, used, hn] = adaptiveStep(y, Math.min(h, remain), rhs, 1e-10,
+        Math.max(0.004, Math.min(0.1*y[0], S.mode !== 0 ? 0.4*S.l + 0.01*S.M : 1e9)));
     if (used <= 0) break;
     remain -= used; h = hn; P.tau += used;
-    if (y[0] <= 0.22*S.M){ y[0] = 0.22*S.M; P.landed = true; break; }
+
+    if (S.mode === 0 && y[0] <= 0.22*S.M){ y[0] = 0.22*S.M; P.landed = true; break; }
+
+    if (S.mode !== 0){
+      if (S.mode === 2 && !P.touchedFuzz && y[0] < S.fuzzR && rb0 >= S.fuzzR){
+        P.touchedFuzz = true;
+        showBanner('FUZZBALL SURFACE — NO HORIZON, NO INTERIOR',
+          'In the fuzzball proposal the would-be interior is a horizon-scale string bound state. You are now inside the microstate, not beyond an event horizon. [MODEL]');
+      }
+      if (S.mode === 2 && P.touchedFuzz && !P.settled && y[0] < 0.92*S.fuzzR && Math.abs(y[1]) < 0.004){
+        P.settled = true; P.landed = true;
+        showBanner('ABSORBED INTO THE MICROSTATE — INFORMATION PRESERVED',
+          'String drag [ad-hoc model] has thermalized your radial energy: your state joins the surface degrees of freedom. Unitarity intact — that is the point of the proposal.', 6500);
+        break;
+      }
+      if (!P.bounced && pb < 0 && y[1] >= 0){
+        P.bounced = true; P.rb = y[0];
+        if (S.mode === 1)
+          showBanner('QUANTUM REPULSION ACTIVATED — SINGULARITY RESOLVED',
+            'Holonomy-type correction caps the curvature at K = 24/l⁴ = '
+            + (24/Math.pow(S.l/S.M, 4)).toExponential(2) + ' M⁻⁴. Collapse reversed at r_b = '
+            + (P.rb/S.M).toFixed(4) + ' M — the root of f = Ẽ². Classical GR would have reached r = 0.', 6500);
+      }
+      if (S.rm > 0){
+        if (!P.inCore && y[0] < S.rm){ P.inCore = true; S.parity ^= 1; }  // core traversal [MODEL]
+        if (P.inCore && y[0] >= S.rm) P.inCore = false;
+      }
+      if (S.mode === 1 && S.rp > 0 && P.bounced && !P.whiteHole && rb0 < S.rp && y[0] >= S.rp && y[1] > 0){
+        P.whiteHole = true;
+        showBanner('WHITE-HOLE HORIZON CROSSED',
+          'You emerge through the past horizon of a NEW exterior region — note the second sky. Reading this as a black-to-white-hole transition is a conjecture of the effective eternal geometry. [MODEL]', 6500);
+      }
+      if (y[1] > 0 && y[0] > P.r0){ P.r = y[0]; P.pr = y[1]; endPlunge(); return; }
+    }
+    if (!P.crossed && S.rp > 0 && y[0] < S.rp && rb0 >= S.rp){
+      P.crossed = true;
+      if (S.mode === 0)
+        showBanner('You have crossed the event horizon',
+          'r < 2M — locally nothing marks the crossing, but every future-directed path now ends at r = 0. The view stays computable: the equations integrated here are regular at r = 2M.');
+      else
+        showBanner('OUTER HORIZON CROSSED — TRAPPED REGION',
+          'Between r₊ and r₋ the radius is timelike: r must decrease. Unlike the classical case, this ends at the quantum core, not at a singularity.');
+    }
   }
-  if (!P.crossed && y[0] < 2*S.M){ P.crossed = true; flashHorizon(); }
   P.r = y[0]; P.pr = y[1];
 }
-// proper time remaining to r = 0 along the radial geodesic: ∫₀^r dr′/√(Ẽ²−f(r′))
-function tauToSingularity(r, Et){
-  const n = 200; let acc = 0;
+/* proper time from r down to rT along the radial geodesic: ∫ dr′/√(Ẽ² − f) (midpoint) */
+function tauToTarget(r, Et, rT){
+  const n = 220; let acc = 0; const span = Math.max(r - rT, 0);
   for (let i = 0; i < n; i++){
-    const rm = r * (i + 0.5)/n;
-    acc += (r/n) / Math.sqrt(Math.max(Et*Et - 1 + 2*S.M/rm, 1e-12));
+    const rm = rT + span*(i + 0.5)/n;
+    acc += (span/n)/Math.sqrt(Math.max(Et*Et - Fm(rm), 1e-12));
   }
   return acc;
-}
-function flashHorizon(){
-  const el = $('horizonFlash');
-  el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 4200);
 }
 
 /* ----------------------- test particles: timelike geodesics ----------------------- */
@@ -819,16 +1212,19 @@ function flashHorizon(){
    placing them inside the lensed main image would require solving the emitter→camera
    boundary-value problem per particle per frame, so the chart is the honest view. */
 let particles = [];
-function circularL(r){ return Math.sqrt(S.M*r*r/(r - 3*S.M)); }
+function circularL(r){   // L² = r³f′/(2f − rf′) [EXACT for f]; NaN ⇒ no circular orbit here
+  const den = 2*Fm(r) - r*Fp(r);
+  return Math.sqrt((den > 1e-9 && Fp(r) > 0) ? r*r*r*Fp(r)/den : NaN);
+}
 function spawnParticles(){
   particles = [];
   const M = S.M, ro = Rout();
-  for (const rc of [6.05, 7.4, 9.2, 11.6, 14.6].map(x => x*M))
-    if (rc < 0.95*ro)
+  for (const rc of [1.008, 1.233, 1.533, 1.933, 2.433].map(x => x*S.rin))
+    if (rc < 0.95*ro && isFinite(circularL(rc)))
       particles.push({ y:[rc, 0, Math.random()*2*PI], L: S.spin*circularL(rc), kind:'circ', trail:[], h:0.05 });
   { // precessing eccentric orbit between r_p = 7.5M and r_a ≈ 0.9 R_out
     const rp = 7.5*M, ra = Math.max(0.9*ro, 12*M);
-    const L2 = (fmet(ra,M) - fmet(rp,M)) / (fmet(rp,M)/(rp*rp) - fmet(ra,M)/(ra*ra));
+    const L2 = (Fm(ra) - Fm(rp)) / (Fm(rp)/(rp*rp) - Fm(ra)/(ra*ra));   // two-turning-point solve, any f
     particles.push({ y:[ra, 0, Math.random()*2*PI], L: S.spin*Math.sqrt(L2), kind:'ecc', trail:[], h:0.05 });
   }
   for (const ph of [0, 2.4]) // sub-critical L ⇒ no centrifugal barrier ⇒ spiral and plunge
@@ -841,14 +1237,15 @@ function stepParticles(dt){
       if (now - p.deadAt > 4500){ p.dead = false; p.trail = []; p.y = [7.2*M, 0, Math.random()*2*PI]; p.h = 0.05; }
       continue;
     }
-    const rhs = timelikeRHS(p.L, M);
+    const rhs = tlRHS(p.L);
     let remain = dt * 6.0;
     while (remain > 1e-9){
       let used, hn;
       [p.y, used, hn] = adaptiveStep(p.y, Math.min(p.h, remain), rhs, 1e-8, Math.max(0.02, 0.12*p.y[0]));
       if (used <= 0) break;
       remain -= used; p.h = hn;
-      if (p.y[0] < 0.05*M){ p.dead = true; p.deadAt = now; break; }
+      if (S.mode === 0 && p.y[0] < 0.05*M){ p.dead = true; p.deadAt = now; break; }
+      if (S.mode !== 0 && p.y[0] < 2e-3*M){ p.y[0] = 4e-3*M - p.y[0]; p.y[1] = -p.y[1]; p.y[2] += PI; }
     }
     const px = p.y[0]*Math.cos(p.y[2]), py = p.y[0]*Math.sin(p.y[2]);
     const t = p.trail, last = t[t.length-1];
@@ -879,13 +1276,35 @@ function drawInset(cam, DB){
   ictx.beginPath(); ictx.arc(cx, cy, Rout()*sc, 0, 2*PI);
   ictx.arc(cx, cy, Rin()*sc, 0, 2*PI, true);
   ictx.fillStyle = grad; ictx.fill();
-  circle(2*S.M, '#3a4b63', null, '#000');
-  circle(3*S.M, 'rgba(190,140,255,0.75)', [4,4]);
-  circle(6*S.M, 'rgba(120,170,220,0.55)', [2,4]);
   ictx.font = '10px ui-monospace, monospace'; ictx.fillStyle = '#8fa3bd';
-  ictx.fillText('2M', cx + 2*S.M*sc + 2, cy - 2);
-  ictx.fillText('3M', cx + 3*S.M*sc + 2, cy + 10);
-  ictx.fillText('6M ISCO', cx + 6*S.M*sc + 2, cy + 22);
+  if (S.rp > 0){
+    circle(S.rp, '#3a4b63', null, '#000');
+    ictx.fillStyle = '#8fa3bd';
+    ictx.fillText(S.mode === 0 ? '2M' : 'r+', cx + S.rp*sc + 2, cy - 2);
+    if (S.rm > 0){
+      circle(S.rm, 'rgba(255,110,90,0.8)', [3,3]);
+      ictx.fillText('r-', cx + S.rm*sc + 2, cy + 10);
+    }
+  }
+  if (S.mode === 2 && S.fuzzR > 0){
+    const fg = ictx.createRadialGradient(cx, cy, 0, cx, cy, S.fuzzR*sc);
+    fg.addColorStop(0, 'rgba(160,90,255,0.34)'); fg.addColorStop(1, 'rgba(120,60,255,0.05)');
+    ictx.beginPath(); ictx.arc(cx, cy, S.fuzzR*sc, 0, 2*PI); ictx.fillStyle = fg; ictx.fill();
+    ictx.fillStyle = '#a98cf0'; ictx.fillText('fuzz', cx + S.fuzzR*sc*0.45, cy - 4);
+  }
+  if (S.rph > 0) circle(S.rph, 'rgba(190,140,255,0.75)', [4,4]);
+  circle(S.risco, 'rgba(120,170,220,0.55)', [2,4]);
+  ictx.fillStyle = '#8fa3bd';
+  if (S.rph > 0) ictx.fillText((S.rph/S.M).toFixed(2) + 'M ph', cx + S.rph*sc + 2, cy + 10);
+  ictx.fillText((S.risco/S.M).toFixed(2) + 'M ISCO', cx + S.risco*sc + 2, cy + 22);
+  if (S.plunge && S.mode === 1){
+    const rb = S.plunge.bounced ? S.plunge.rb : bounceRadius(S.plunge.Et0);
+    if (rb > 0){
+      circle(rb, 'rgba(110,255,160,0.85)', [2,3]);
+      ictx.fillStyle = 'rgba(110,255,160,0.85)';
+      ictx.fillText('r_b', cx + rb*sc + 2, cy - 12);
+    }
+  }
   // particles
   for (const p of particles){
     if (p.trail.length > 1){
@@ -913,7 +1332,8 @@ function drawInset(cam, DB){
   ictx.lineTo(mx + fx*16, my - fy*16);
   ictx.strokeStyle = 'rgba(223,232,245,0.7)'; ictx.stroke();
   ictx.fillStyle = '#8fa3bd';
-  ictx.fillText('orbit chart — Schwarzschild (r, φ), disk plane', 8, H - 8);
+  ictx.fillStyle = '#8fa3bd';
+  ictx.fillText('orbit chart — ' + (S.mode === 0 ? 'Schwarzschild' : S.mode === 1 ? 'Hayward (LQG-inspired)' : 'fuzzball stand-in') + ' (r, φ), disk plane', 8, H - 8);
 }
 
 /* ----------------------------------- UI ----------------------------------- */
@@ -927,16 +1347,59 @@ function syncSliders(){
   $('mass').value = S.M;    $('massV').textContent = S.M.toFixed(2);
 }
 bindSlider('mass', 'M', v => v.toFixed(2), () => {
-  S.dist = Math.max(S.dist, 2.3*S.M); syncSliders(); spawnParticles();
+  recompute(); syncSliders(); spawnParticles();
 });
-bindSlider('dist', 'dist', v => v.toFixed(1), () => { S.dist = Math.max(S.dist, 2.3*S.M); syncSliders(); });
+bindSlider('dist', 'dist', v => v.toFixed(1), () => { clampDist(); syncSliders(); });
 bindSlider('incl', 'inclDeg', v => v.toFixed(0) + '°');
 bindSlider('fov',  'fovDeg',  v => v.toFixed(0) + '°');
 bindSlider('tpeak','Tpeak',   v => v.toFixed(0) + ' K');
 bindSlider('expo', 'exposure',v => v.toFixed(2));
 bindSlider('rscale','resScale', v => Math.round(v*100) + '%');
-bindSlider('rout', 'routFac', v => 'r_out = ' + (6*v).toFixed(1) + ' M', () => spawnParticles());
+bindSlider('rout', 'routFac', v => v.toFixed(1) + ' × r_in', () => spawnParticles());
 bindSlider('prate','plungeRate', v => v.toFixed(1) + '×');
+
+/* ---------------- quantum-mode controls ---------------- */
+function plungeLabel(){
+  return S.mode === 0 ? 'Plunge through the horizon'
+       : S.mode === 1 ? 'Plunge — ride the quantum bounce'
+       : 'Plunge into the fuzzball';
+}
+function qscaleLabel(){
+  if (S.mode === 1) return 'l = ' + (S.l/S.M).toFixed(2) + ' M' + (S.qs < 0.021 ? ' (floor)' : '');
+  if (S.mode === 2) return 'openness ' + Math.round(S.qs*100) + '%';
+  return '— (classical)';
+}
+const MODE_NOTES = [
+  'Pure Schwarzschild [EXACT]. The plunge ends at the central singularity; the shadow is the photon-capture set b < 3√3 M.',
+  'Hayward regular metric as an LQG-inspired effective model [MODEL]: curvature capped at 24/l⁴, infall bounces where f = Ẽ². For l < 0.7698 M: two horizons, and core-threading sightlines reach a second exterior (black→white-hole reading). Larger l: horizonless — watch the shadow fill in.',
+  'Fuzzball stand-in [MODEL]: horizonless capped metric for geodesics + emissive string-filament volume [DECOR] weighted by the exact static-emitter redshift √f/E — surface redshift is why it still looks black at low quantum scale.',
+];
+function setMode(m){
+  endPlunge();
+  S.mode = m; S.parity = 0;
+  for (const [id, k] of [['modeC', 0], ['modeL', 1], ['modeF', 2]])
+    $(id).classList.toggle('active', k === m);
+  document.body.classList.remove('mC', 'mL', 'mF');
+  document.body.classList.add(m === 0 ? 'mC' : m === 1 ? 'mL' : 'mF');
+  recompute();
+  $('qscale').disabled = (m === 0);
+  $('qscaleV').textContent = qscaleLabel();
+  $('modeNote').textContent = MODE_NOTES[m];
+  $('plungeBtn').textContent = plungeLabel();
+  spawnParticles();
+}
+$('modeC').addEventListener('click', () => setMode(0));
+$('modeL').addEventListener('click', () => setMode(1));
+$('modeF').addEventListener('click', () => setMode(2));
+$('qscale').addEventListener('input', () => {
+  S.qs = parseFloat($('qscale').value);
+  recompute();
+  $('qscaleV').textContent = qscaleLabel();
+});
+$('qscale').addEventListener('change', () => spawnParticles());
+bindSlider('femit', 'femit', v => v.toFixed(2));
+$('aboutBtn').addEventListener('click', () => $('aboutBox').classList.add('show'));
+$('aboutClose').addEventListener('click', () => $('aboutBox').classList.remove('show'));
 
 for (const [id, key] of [['tDisk','disk'],['tStars','stars'],['tGrid','grid'],['tShift','shift'],
                          ['tBeam','beam'],['tTurb','turb'],['tDrift','drift'],['tInset','inset']]){
@@ -948,8 +1411,8 @@ $('tSpin').addEventListener('change', e => { S.spin = e.target.checked ? -1 : 1;
 $('tidalSel').addEventListener('change', e => { S.tidalMass = parseFloat(e.target.value); });
 $('plungeBtn').addEventListener('click', () => S.plunge ? endPlunge() : startPlunge());
 $('resetBtn').addEventListener('click', () => {
-  endPlunge(); S.yaw = -0.55; S.pitch = 0.10; S.dist = 27; S.M = 1;
-  $('mass').value = 1; $('massV').textContent = '1.00'; syncSliders();
+  endPlunge(); S.yaw = -0.55; S.pitch = 0.10; S.dist = 27; S.M = 1; S.parity = 0;
+  $('mass').value = 1; $('massV').textContent = '1.00'; recompute(); syncSliders();
 });
 $('valBtn').addEventListener('click', () => {
   const box = $('valbox'); box.classList.add('show');
@@ -980,7 +1443,7 @@ canvas.addEventListener('pointermove', e => {
     const ps = [...pointers.values()];
     const d = Math.hypot(ps[0][0]-ps[1][0], ps[0][1]-ps[1][1]);
     if (pinchDist > 0 && !S.plunge){
-      S.dist = Math.min(140, Math.max(2.3*S.M, S.dist * pinchDist / d));
+      S.dist = Math.min(140, Math.max(minD(), S.dist * pinchDist / d));
       syncSliders();
     }
     pinchDist = d;
@@ -1001,36 +1464,80 @@ canvas.addEventListener('wheel', e => {
   e.preventDefault();
   S.interacting = performance.now();
   if (S.plunge) return;
-  S.dist = Math.min(140, Math.max(2.3*S.M, S.dist * Math.exp(e.deltaY * 0.0011)));
+  S.dist = Math.min(140, Math.max(minD(), S.dist * Math.exp(e.deltaY * 0.0011)));
   syncSliders();
 }, { passive:false });
 
 /* --------------------------------- HUD --------------------------------- */
 const Gc = 6.674e-11, cc = 2.998e8, Msun = 1.989e30;
+function regionLabel(){
+  const r = S.plunge ? S.plunge.r : S.dist;
+  if (S.mode === 0) return r > 2*S.M ? 'exterior (static patch)' : 'TRAPPED - inside the horizon';
+  if (S.rp > 0){
+    if (r > S.rp) return 'exterior ' + (S.parity ? 'B (post-bounce universe) [model]' : 'A');
+    if (r > S.rm) return (S.plunge && S.plunge.pr > 0) ? 'ANTI-TRAPPED (white-hole region)' : 'TRAPPED (r must decrease)';
+    return 'quantum core (f > 0 again)';
+  }
+  if (S.mode === 2) return r < S.fuzzR ? 'inside the fuzz (no horizon anywhere)' : 'exterior (horizonless object)';
+  return r < S.rfmin ? 'quantum core (horizonless)' : 'exterior (horizonless object)';
+}
 function updateHUD(cam){
-  const rM = cam.r / S.M;
-  let txt = '';
+  const M = S.M, r = cam.r, rM = r/M;
+  const Mp = S.tidalMass * Msun;
+  const tUnit = Gc*Mp/(cc*cc*cc);                       // 1 geometric time unit, seconds
+  const fp = Fp(r), fpp = Fpp(r);
+  const tideR = -0.5*fpp, tideT = -0.5*fp/r;            // [EXACT for f], geometric units
+  const tideRcl = 2*M/(r*r*r);                          // classical at the same r
+  const Khat = KofR(r)*M**4, KhatCl = 48/Math.pow(rM, 6);
+  const Kcap = (S.l > 0) ? 24/Math.pow(S.l/M, 4) : Infinity;
+  // SI: dimensionless t-hat = tide*M^2;  da = h*t-hat*c^6/(G^2 Mp^2), h = 2 m body, in g
+  const aSI = t => 2*Math.abs(t)*M*M*Math.pow(cc, 6)/(Gc*Gc*Mp*Mp)/9.80665;
+  const modeName = ['CLASSICAL GR (Schwarzschild)', 'LQG-INSPIRED BOUNCE (Hayward) [model]', 'FUZZBALL STAND-IN [model]'][S.mode];
+  let txt = 'mode      ' + modeName + '\n';
+  txt += 'region    ' + regionLabel() + '\n';
+  txt += 'r         ' + rM.toFixed(3) + ' M\n';
   if (S.plunge){
     const P = S.plunge;
-    const Mp = S.tidalMass * Msun;
-    const tUnit = Gc * Mp / (cc*cc*cc);                       // 1 geometric time unit, seconds
-    const tidal = 4 * Math.pow(cc, 6) / (Gc*Gc*Mp*Mp * Math.pow(rM, 3)) / 9.80665; // 2m body, in g
-    const tRem = tauToSingularity(P.r, P.Et0) / S.M;
-    txt += 'mode      free fall (radial geodesic)\n';
-    txt += 'r         ' + rM.toFixed(3) + ' M' + (P.r < 2*S.M ? '   — INSIDE THE HORIZON' : '') + '\n';
-    txt += 'τ elapsed ' + (P.tau/S.M).toFixed(1) + ' M  (' + (P.tau/S.M*tUnit).toFixed(4) + ' s @ ' + S.tidalMass.toLocaleString() + ' M☉)\n';
-    txt += 'τ to r=0  ' + tRem.toFixed(1) + ' M  (' + (tRem*tUnit).toFixed(4) + ' s)\n';
-    if (P.r > 2*S.M) txt += 'v/c (shell) ' + Math.min(0.99999, cam.w/cam.Et).toFixed(5) + '\n';
-    else txt += 'v/c (shell) —  no static frame exists inside r = 2M\n';
-    txt += 'tidal Δa  ' + tidal.toExponential(2) + ' g  (head–feet, 2 m body)\n';
-    txt += '          radial stretch +2M/r³, transverse squeeze −M/r³';
-    if (P.landed) txt += '\n— halted at r = 0.22M: curvature (∝ M/r³) diverges ahead —';
+    txt += 'tau       ' + (P.tau/M).toFixed(1) + ' M  (' + (P.tau/M*tUnit).toFixed(4) + ' s @ ' + S.tidalMass.toLocaleString() + ' Msun)\n';
+    if (S.mode === 0){
+      const tRem = tauToTarget(P.r, P.Et0, 0)/M;
+      txt += 'tau to r=0 ' + tRem.toFixed(1) + ' M  (' + (tRem*tUnit).toFixed(4) + ' s)\n';
+    } else if (S.mode === 1){
+      const rb = P.bounced ? P.rb : bounceRadius(P.Et0);
+      if (!P.bounced && rb > 0 && P.r > rb){
+        txt += 'tau to bounce ' + (tauToTarget(P.r, P.Et0, rb)/M).toFixed(2) + ' M | dist to resolution ' + ((P.r - rb)/M).toFixed(3) + ' M\n';
+        txt += 'resolution at r_b = ' + (rb/M).toFixed(4) + ' M  (root of f = Et^2)\n';
+      } else if (P.bounced){
+        txt += 'RESOLVED - bounced at r_b = ' + (P.rb/M).toFixed(4) + ' M' + (P.whiteHole ? ' | now in exterior B' : '') + '\n';
+      }
+    } else {
+      if (P.r > S.fuzzR) txt += 'dist to fuzz surface ' + ((P.r - S.fuzzR)/M).toFixed(2) + ' M\n';
+      else txt += (P.settled ? 'settled in the microstate (drag-thermalized) [model]' : 'inside the fuzz - string drag active [model]') + '\n';
+    }
+    if (Fm(P.r) > 0) txt += 'v/c shell ' + Math.min(0.99999, Math.abs(P.pr)/cam.Et).toFixed(5) + '\n';
+    else txt += 'v/c shell -  (no static frame here: f < 0)\n';
+    if (S.mode === 0 && P.landed) txt += '- halted at r = 0.22M: K = 48M^2/r^6 diverges ahead -\n';
+  } else if (S.bc > 0){
+    txt += 'shadow    b_c = ' + (S.bc/M).toFixed(4) + ' M  (photon sphere r_ph = ' + (S.rph/M).toFixed(3) + ' M)\n';
   } else {
-    txt += 'mode      static observer (hovering; proper acceleration ∝ M/(r²√f))\n';
-    txt += 'r         ' + rM.toFixed(2) + ' M\n';
-    txt += 'shadow    θ ≈ ' + (Math.asin(Math.min(1, 3*Math.sqrt(3)*S.M*Math.sqrt(Math.max(fmet(cam.r,S.M),0))/cam.r))*180/PI).toFixed(1)
-        + '°  (sin θ = b_c √f / r, b_c = 3√3 M)\n';
-    txt += 'ISCO 6M · photon sphere 3M · horizon 2M';
+    txt += 'shadow    NONE - no photon sphere at this l: light traverses the core\n';
+  }
+  txt += 'K*M^4     ' + Khat.toExponential(2) + (S.mode !== 0
+       ? '  [cap 24M^4/l^4 = ' + Kcap.toExponential(2) + ' | classical here ' + KhatCl.toExponential(2) + ']'
+       : '  (= 48/(r/M)^6, diverges at r = 0)') + '\n';
+  txt += 'tides     radial ' + (tideR >= 0 ? 'stretch ' : 'squeeze ') + aSI(tideR).toExponential(2)
+       + ' g | transverse ' + (tideT >= 0 ? 'stretch ' : 'squeeze ') + aSI(tideT).toExponential(2) + ' g  (2 m body)\n';
+  if (S.mode !== 0){
+    const heal = Math.max(0, Math.min(100, 100*(1 - Math.abs(tideR)/tideRcl)));
+    txt += 'healing   ' + heal.toFixed(1) + '% vs classical 2M/r^3 (core limit: isotropic de Sitter +1/l^2)\n';
+    const D = r*r*r + 2*M*S.l*S.l;
+    txt += 'QCS       ' + (2*M*S.l*S.l/D).toFixed(4) + '  = 2Ml^2/(r^3+2Ml^2), fractional metric correction\n';
+    txt += 'horizons  ' + (S.rp > 0 ? 'r- = ' + (S.rm/M).toFixed(4) + ' M | r+ = ' + (S.rp/M).toFixed(4) + ' M'
+                                    : 'NONE - horizonless (l > 4M/3sqrt3 ~ 0.7698 M)') + '\n';
+    txt += 'ISCO      ' + (S.risco/M).toFixed(3) + ' M | l = ' + (S.l/M).toFixed(3) + ' M';
+    if (S.mode === 2) txt += ' | surface z = ' + (1/Math.sqrt(Math.max(S.fmin, 1e-9)) - 1).toExponential(2);
+  } else {
+    txt += 'ISCO 6M | photon sphere 3M | horizon 2M';
   }
   $('hud').textContent = txt;
 }
@@ -1081,6 +1588,13 @@ function frame(){
   gl.uniform1f(U.uExposure, S.exposure);
   gl.uniform1f(U.uTime, now/1000);
   gl.uniform1f(U.uSpin, S.spin);
+  gl.uniform1i(U.uMode, S.mode);
+  gl.uniform1f(U.uL, S.l);
+  gl.uniform1f(U.uRm, S.rm);
+  gl.uniform1f(U.uParity, S.parity);
+  gl.uniform1f(U.uFuzzR, S.fuzzR);
+  gl.uniform1f(U.uFuzzEmit, S.femit);
+  gl.uniform1f(U.uFuzzKap, 1.9/S.M);
   const fl = (S.show.disk?1:0) | (S.show.stars?2:0) | (S.show.grid?4:0) | (S.show.shift?8:0)
            | (S.show.beam?16:0) | (S.show.turb?32:0) | (S.show.drift?64:0);
   gl.uniform1i(U.uFlags, fl);
@@ -1097,7 +1611,7 @@ function frame(){
   }
   requestAnimationFrame(frame);
 }
-spawnParticles();
+setMode(0);            // sets body class, labels, recompute(), spawnParticles()
 syncSliders();
 requestAnimationFrame(frame);
 </script>
